@@ -27,7 +27,13 @@ test('posts the lead with the service token to match-lead', async () => {
   expect(init.headers.Authorization).toBe('Bearer tok');
   expect(JSON.parse(init.body)).toEqual({ province: 'BC', industry: 'Manufacturing' });
   expect(init.signal).toBeDefined();
-  expect(r).toEqual({ ok: true, status: 'ok', grants: [{ grant_id: 1 }], inputs_used: { province: ['British Columbia'] }, dropped: [] });
+  expect(r).toEqual({ ok: true, status: 'ok', grants: [{ grant_id: 1 }], estimate: null, inputs_used: { province: ['British Columbia'] }, dropped: [] });
+});
+
+test('the estimate block passes through untouched', async () => {
+  const estimate = { low: 50000, high: 150000, status: 'ok', per_goal: [{ goal: 'Hire or Train People', low: 50000, high: 150000, match_count: 3 }] };
+  const fetch = reply(200, { status: 'ok', grants: [], estimate, inputs_used: {}, dropped: [] });
+  expect((await matchLead({ province: 'BC', industry: 'Construction' }, { env, fetch })).estimate).toEqual(estimate);
 });
 
 test('insufficient_profile passes through with missing fields', async () => {

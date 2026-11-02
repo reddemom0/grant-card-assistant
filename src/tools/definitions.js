@@ -3246,14 +3246,18 @@ export function getToolsForAgent(agentType) {
       const webSearchTool = SERVER_TOOLS.find(t => t.name === 'web_search');
       // search_getgranted (the GG1-mirror search) is its own const; Oracle's
       // ORACLE_TOOLS carries grant_data (GG3) in its place.
-      const searchGrantedTool = SEARCH_GETGRANTED_TOOL;
+      // gg3 matcher: the estimate is precomputed at intake and the agent never
+      // names programs, so the search is dropped (its handler would also
+      // overwrite the session's estimate memory). docs/lead-gen.md.
+      const gg3Matcher = String(process.env.LEAD_GEN_MATCHER || '').trim().toLowerCase() === 'gg3';
+      const searchGrantedTool = gg3Matcher ? null : SEARCH_GETGRANTED_TOOL;
       const leadGenTools = [
         ...(webSearchTool ? [webSearchTool] : []),   // Anthropic-controlled, safe
         ...MEMORY_TOOLS,                              // session-scoped DB key-value, safe
         ...(searchGrantedTool ? [searchGrantedTool] : []), // read-only grants DB, safe
         ...LEAD_GEN_KNOWLEDGE_TOOLS                  // on-demand FAQ + strategy KB search
       ];
-      console.log(`🔧 Agent lead-gen using restricted public tool set (${leadGenTools.length} tools): web_search, memory_store/recall/list, search_getgranted, search_lead_gen_knowledge, search_lead_gen_strategy, save_lead_data`);
+      console.log(`🔧 Agent lead-gen using restricted public tool set (${leadGenTools.length} tools): web_search, memory_store/recall/list, ${searchGrantedTool ? 'search_getgranted, ' : ''}search_lead_gen_knowledge, search_lead_gen_strategy, save_lead_data${gg3Matcher ? ' (matcher: gg3)' : ''}`);
       return leadGenTools;
     }
 

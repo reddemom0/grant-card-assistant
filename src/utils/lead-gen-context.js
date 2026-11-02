@@ -7,6 +7,7 @@
 
 import { query } from '../database/connection.js';
 import { describeRecommendedProduct } from '../api/lead-gen-helpers.js';
+import { describeGg3Estimate, isGg3Session } from '../services/lead-gen-gg3-estimate.js';
 
 /**
  * Load lead-gen form data and company background for a session.
@@ -68,6 +69,10 @@ export async function getLeadGenFormContext(conversationId) {
     // booking link resolves to is still decided server-side when the
     // {{BOOKING_LINK}} sentinel is substituted (src/api/booking-link-routing.js).
     context += `${describeRecommendedProduct(prospectData)}\n`;
+    // gg3 mode: the stored estimate, exact figures, every turn.
+    if (isGg3Session(prospectData)) {
+      context += `${describeGg3Estimate(prospectData.gg3_estimate)}\n`;
+    }
     if (prospectData.hiring_plans) {
       context += `Hiring Plans: ${prospectData.hiring_plans}\n`;
     }
@@ -201,6 +206,13 @@ export async function getStrategicContext(conversationId) {
     const session = sessionResult.rows[0];
     const prospectData = session.prospect_data || {};
     const companyBg = session.company_background || {};
+
+    // gg3 mode: the estimate is precomputed. This block exists "for estimation
+    // accuracy" and would invite the model to work out figures of its own.
+    if (isGg3Session(prospectData)) {
+      console.log(`ℹ️  Strategic context skipped (gg3 matcher — estimate precomputed)`);
+      return null;
+    }
 
     // Build query from industry + planned_activities
     let queryParts = [];

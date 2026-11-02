@@ -221,7 +221,7 @@ export function buildFormFields(sessionData, agentInput) {
 // FORM SUBMISSION
 // ============================================================================
 
-export async function submitLeadGenForm(sessionData, agentInput, axiosLib = null) {
+export async function submitLeadGenForm(sessionData, agentInput, axiosLib = null, deps = {}) {
   const fields = buildFormFields(sessionData, agentInput);
 
   // Server-derived client IP (from getClientIp at init time, stored in
@@ -258,34 +258,159 @@ export async function submitLeadGenForm(sessionData, agentInput, axiosLib = null
   }
 
   const axios = axiosLib || (await import('axios')).default;
+  const sleep = deps.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
+
+  // 1. Submit, retrying transient failures (no response, 5xx, 429).
+  let attempt = await postFormWithRetry(axios, payload, sessionData.contact_email, sleep);
+  if (attempt.success) return { ...attempt, fieldCount: fields.length };
+
+  const errors = parseFormErrors(attempt.details);
+  console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} status=${attempt.status ?? 'none'} errors=${JSON.stringify(errors)} message="${attempt.error}"`);
+
+  // 2. One repaired retry for a missing or invalid website: the company's
+  //    email domain, unless it's a free-mail domain.
+  if (errors.some((e) => e.field === 'website')) {
+    const website = websiteFromEmail(sessionData.contact_email || agentInput?.email);
+    if (website) {
+      const repairedFields = [
+        ...fields.filter((f) => f.name !== 'website'),
+        { objectTypeId: '0-1', name: 'website', value: website }
+      ];
+      console.log(`🔧 Retrying HubSpot form with website=${website} (from the email domain)`);
+      attempt = await postFormWithRetry(axios, { ...payload, fields: repairedFields }, sessionData.contact_email, sleep);
+      if (attempt.success) {
+        return { ...attempt, fieldCount: repairedFields.length, repaired: { website } };
+      }
+      console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} repaired retry also rejected: ${JSON.stringify(parseFormErrors(attempt.details))}`);
+    } else {
+      console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} website required but the email domain is free-mail or unreadable — no repair`);
+    }
+  }
+
+  return {
+    success: false,
+    rejected: true,
+    status: attempt.status ?? null,
+    error: attempt.error,
+    errors: parseFormErrors(attempt.details),
+    details: attempt.details,
+    fields
+  };
+}
+
+/** Transient = no HTTP response, 5xx or 429. Those are retried; a 4xx
+ *  rejection isn't, since the same payload would be rejected again. */
+const FORM_RETRY_DELAYS_MS = [1000, 3000];
+
+async function postFormWithRetry(axios, payload, email, sleep) {
+  for (let i = 0; ; i++) {
+    try {
+      console.log(`📨 Submitting HubSpot form (${payload.fields.length} fields) for ${email}${i > 0 ? ` — retry ${i}` : ''}`);
+      const response = await axios.post(HUBSPOT_FORM_SUBMIT_URL, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+      });
+      // Forms API returns 200 with a JSON body. If `redirectUri` is omitted from
+      // the payload (we omit it), the response body sometimes includes the
+      // contact's vid under `inlineMessage` or related fields. We don't rely on
+      // that — `findContactByEmailWithRetry` covers all cases. But we log the
+      // response in case future implementers want to optimize the happy path.
+      console.log(`✅ HubSpot form submitted (status: ${response.status})`);
+      if (response.data && typeof response.data === 'object') {
+        console.log(`   Response keys: ${Object.keys(response.data).join(', ')}`);
+      }
+      return { success: true, response: response.data };
+    } catch (err) {
+      const status = err.response?.status;
+      const transient = !err.response || status >= 500 || status === 429;
+      const errPayload = err.response?.data || err.message;
+      console.error('❌ HubSpot form submission failed:', errPayload);
+      if (transient && i < FORM_RETRY_DELAYS_MS.length) {
+        await sleep(FORM_RETRY_DELAYS_MS[i]);
+        continue;
+      }
+      return {
+        success: false,
+        status,
+        error: err.response?.data?.message || err.message,
+        details: err.response?.data
+      };
+    }
+  }
+}
+
+/**
+ * Forms API v3 rejection body → [{ type, field, message }]. The field name is
+ * read from the message ("…fields.website…" or "'website'"), else null.
+ */
+export function parseFormErrors(details) {
+  const list = Array.isArray(details?.errors) ? details.errors : [];
+  return list.map((e) => {
+    const msg = String(e?.message || '');
+    const m = msg.match(/fields\.([a-z0-9_]+)/i) || msg.match(/'([a-z0-9_]+)'/i) || msg.match(/"([a-z0-9_]+)"/i);
+    return { type: e?.errorType || null, field: m ? m[1] : null, message: msg };
+  });
+}
+
+const FREE_MAIL_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.ca', 'outlook.com', 'live.com', 'live.ca',
+  'msn.com', 'yahoo.com', 'yahoo.ca', 'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me',
+  'protonmail.com', 'shaw.ca', 'telus.net', 'rogers.com', 'sympatico.ca', 'bell.net', 'gmx.com', 'videotron.ca'
+]);
+
+/** "jane@acme.ca" → "https://acme.ca"; null for free-mail or unreadable. */
+export function websiteFromEmail(email) {
+  const domain = String(email || '').trim().toLowerCase().split('@')[1];
+  if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain) || FREE_MAIL_DOMAINS.has(domain)) return null;
+  return `https://${domain}`;
+}
+
+// ============================================================================
+// CRM UPSERT FALLBACK
+//
+// When the form is rejected even after a repaired retry, the lead would never
+// reach HubSpot. Upsert the Contact directly by email instead, so the PATCH,
+// Note and email steps still have a record. The form-submission event (and its
+// reporting bucket) is lost for that lead; finalization records that on
+// prospect_data.hubspot_sync.
+// ============================================================================
+
+const CORE_UPSERT_PROPERTIES = new Set(['firstname', 'lastname', 'email', 'company', 'phone', 'website', 'best_fit_product']);
+
+export async function upsertLeadGenContact(formFields, hubspotClient) {
+  const all = {};
+  for (const f of formFields || []) {
+    if (f.value !== '' && f.value != null) all[f.name] = f.value;
+  }
+  if (!all.email) return { success: false, error: 'email is required' };
+  all.submission_source = SUBMISSION_SOURCE_VALUE;
+
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log(`\n🧪 TEST MODE — Would upsert contact by email (${all.email}):`);
+    console.log(JSON.stringify({ endpoint: '/crm/v3/objects/contacts/batch/upsert', properties: all }, null, 2));
+    return { success: true, testMode: true, properties: 'all' };
+  }
+
+  const upsert = (properties) => hubspotClient.post('/crm/v3/objects/contacts/batch/upsert', {
+    inputs: [{ idProperty: 'email', id: all.email, properties }]
+  });
 
   try {
-    console.log(`📨 Submitting HubSpot form (${fields.length} fields) for ${sessionData.contact_email}`);
-
-    const response = await axios.post(HUBSPOT_FORM_SUBMIT_URL, payload, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 10000
-    });
-
-    // Forms API returns 200 with a JSON body. If `redirectUri` is omitted from
-    // the payload (we omit it), the response body sometimes includes the
-    // contact's vid under `inlineMessage` or related fields. We don't rely on
-    // that — `findContactByEmailWithRetry` covers all cases. But we log the
-    // response in case future implementers want to optimize the happy path.
-    console.log(`✅ HubSpot form submitted (status: ${response.status})`);
-    if (response.data && typeof response.data === 'object') {
-      console.log(`   Response keys: ${Object.keys(response.data).join(', ')}`);
-    }
-
-    return { success: true, response: response.data, fieldCount: fields.length };
+    await upsert(all);
+    console.log(`✅ Contact upserted directly (form fallback) for ${all.email}`);
+    return { success: true, properties: 'all' };
   } catch (err) {
-    const errPayload = err.response?.data || err.message;
-    console.error('❌ HubSpot form submission failed:', errPayload);
-    return {
-      success: false,
-      error: err.response?.data?.message || err.message,
-      details: err.response?.data
-    };
+    // A form value the CRM won't take as a property (e.g. an enum label):
+    // retry with the core identity fields only.
+    console.warn(`⚠️  Contact upsert with all fields failed (${err.response?.data?.message || err.message}) — retrying with core fields`);
+    const core = Object.fromEntries(Object.entries(all).filter(([k]) => CORE_UPSERT_PROPERTIES.has(k) || k === 'submission_source'));
+    try {
+      await upsert(core);
+      console.log(`✅ Contact upserted directly with core fields (form fallback) for ${all.email}`);
+      return { success: true, properties: 'core' };
+    } catch (err2) {
+      return { success: false, error: err2.response?.data?.message || err2.message };
+    }
   }
 }
 
@@ -348,7 +473,7 @@ export async function findContactByEmailWithRetry(email, hubspotClient, attempts
 // CRM v3 endpoint.
 // ============================================================================
 
-export async function patchAIContactProperties(contactId, { bestFitProduct, emailSummaryBody, marketingOptIn }, hubspotClient) {
+export async function patchAIContactProperties(contactId, { bestFitProduct, emailSummaryBody, marketingOptIn, grantCalcMin, grantCalcMax }, hubspotClient) {
   const properties = {
     submission_source: SUBMISSION_SOURCE_VALUE
   };
@@ -356,6 +481,10 @@ export async function patchAIContactProperties(contactId, { bestFitProduct, emai
   if (bestFitProduct)   properties.best_fit_product   = bestFitProduct;
   if (emailSummaryBody) properties.email_summary_body = emailSummaryBody;
   if (marketingOptIn !== undefined) properties.marketing_opt_in = marketingOptIn;
+  // gg3 matcher only: the stored estimate's total range, whole dollars
+  // (both are HubSpot number properties).
+  if (grantCalcMin != null) properties.grant_calc_min = Math.round(grantCalcMin);
+  if (grantCalcMax != null) properties.grant_calc_max = Math.round(grantCalcMax);
 
   // TEST MODE: log and return success
   if (process.env.LEAD_GEN_TEST_MODE === 'true') {

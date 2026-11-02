@@ -56,7 +56,8 @@ request, so it is observable at runtime.
 
 ## Tool loadout
 
-Seven tools, assembled by name rather than by spreading groups. The case opens with a
+Seven tools in legacy mode, six with `LEAD_GEN_MATCHER=gg3` (no `search_getgranted`; see
+"Matcher switch"), assembled by name rather than by spreading groups. The case opens with a
 comment headed "Public chatbot — deliberately restricted tool set for security."
 
 Included: `web_search`; `memory_store` / `memory_recall` / `memory_list`;
@@ -106,6 +107,69 @@ the constant is 12 — the comment is stale.
 **`LEAD_GEN_TEST_MODE` is misnamed.** It mocks HubSpot writes across *all* agents, at
 fifteen call sites. It does **not** stop email sending.
 
+## Matcher switch (`LEAD_GEN_MATCHER`)
+
+Where the funding figures come from. `legacy` (default, and anything other than `gg3`)
+is everything else on this page: the rate-table baseline, then the model's own estimate.
+`gg3` makes one stored estimate the only source of figures.
+
+**Sticky per session.** `/init` reads the env once and writes `prospect_data.lead_gen_matcher:
+'gg3'`. Legacy sessions don't have the key. Everything after reads the session's value
+(`isGg3Session`), so flipping the env mid-session can't mix the two. The one exception is
+the tool loadout, which `getToolsForAgent` builds from the env per request; a gg3 session
+that is offered `search_getgranted` anyway gets a refusal from the executor.
+
+**Intake** (`runGg3IntakeCategorization` in `src/api/lead-gen-init.js`):
+- **Concurrent:** `categorizeProspect(skipHaiku)` runs for `service_tier` (the not_a_fit rules) and the consultant. `fetchLeadGenEstimate` (`src/services/lead-gen-gg3-estimate.js`) calls gg3 match-lead with an 8 s timeout.
+- **Goals** (`mapWidgetToGoals`):
+  - Training Budget (anything but "None planned") → Hire or Train People.
+  - Market Expansion budget → International Growth.
+  - `planned_activities` free text → passed as-is; gg3's own cue table maps it.
+  - **Hiring Plans is never a goal source.**
+- **Province:** the widget's comma-joined list is split. "Just me" → 1.
+- **Stored on `prospect_data.gg3_estimate`:** `{ status, low, high, per_goal, matches_used, revenue_band_used, notes, inputs_used, dropped, cards }`, where status is `ok | confirm_needed | insufficient_profile | unavailable`. `cards` holds gg3's top-5 names and providers, for the internal Note only. Failure or timeout → `unavailable`, logged `[LEAD-GEN-GG3-ESTIMATE-FAIL]`.
+- **Tier — always locked here, never pending** (`computeGg3BestFitProduct`):
+  - status `ok` → `computeBestFitProduct` on the estimate formatted low-first, so the $15,000 Starter threshold reads `estimate.low`;
+  - anything else → the size rule alone: Pro gate → Granted Pro, else Get Granted.
+
+  Nonprofit and not_a_fit win as always. The tier still locks if categorization throws.
+- **`estimated_funding`** is `formatEstimateRange(estimate)`, full dollars ("$50,000–$250,000"), only when status is `ok`. The rate-table baseline is never shown.
+
+**Chat.** `getLeadGenFormContext` adds a "Funding estimate" block to `<lead_info>`:
+- **`ok`:** the exact total and per-goal ranges, marked as overriding any estimation method in the prompt.
+- **`confirm_needed`:** "matching programs exist; amounts confirmed on review", no figure.
+- **Otherwise:** no figure and no claim of matches.
+
+Both prompts (`.claude/agents/lead-gen.md`, Variant B `system-operations.md`) carry one `<precomputed_estimate>` rule that defers to the block. `getStrategicContext` returns null for gg3 sessions.
+
+**The model can't change a figure.** Each write path is pinned to the stored estimate (`pinFundingToGg3`):
+- **`memory_store`:** writes of `estimated_funding`, `available_now_funding` and `programs_matched_count` are not merged into `prospect_data`.
+- **`save_lead_data`:** these fields are pinned. `matched_programs` becomes gg3's card names.
+- **`loadEnrichedSessionData`:** pins the same fields, so the form, Note, fallback email and team notification all read the stored value.
+
+**Email.** `composeLeadGenEmailBody` (`src/api/lead-gen-finalization.js`) picks the body. In gg3 mode:
+- The agent's `email_summary_body` is kept only if every dollar figure in it is a stored figure: the estimate's bounds, or the form's own bucket bounds (`findForeignFigures`).
+- Otherwise the template is sent, built from the stored estimate (`generateFallbackEmail`'s gg3 branch), and `[ESTIMATE-MISMATCH]` is logged.
+- That send has kind `gg3_template`, which is not upgrade-eligible, and an upgrade send whose body was refused is skipped.
+
+**HubSpot.**
+- **Note:** a "Funding Estimate (gg3 match-lead)" section (total, per goal, matches, band, goals, notes). It replaces the rate-table baseline line.
+- **AI-property PATCH:** adds `grant_calc_min` / `grant_calc_max` (number properties) when status is `ok`.
+- **`email_summary_body`:** the composed (validated or template) body.
+
+**Verified 2026-11-02** (local, TEST_MODE, prod gg3, three leads): every figure was identical on every surface.
+- **Surfaces checked:** match-lead's estimate, `<lead_info>`, chat, email, Note, `grant_calc_*`, and the `estimated_funding` column.
+- **Chat formatting:** chat abbreviates ("$368.5K"), but the values are the same.
+- **Legacy:** intake, `<lead_info>` and loadout were byte-identical to HEAD.
+
+## HubSpot form rejections
+
+`submitLeadGenForm` (`src/api/hubspot-form-submission.js`) no longer gives up on the first failure. Both modes:
+1. **Transient failures** (no response, 5xx, 429) are retried twice (1 s, 3 s). A 4xx isn't retried as-is.
+2. **A rejection naming `website`** (`parseFormErrors`) is retried once with `https://<email domain>`. Free-mail domains get no repair. The forms token lacks the forms scope, so the form's required fields could not be read; this is keyed off HubSpot's error message, not the schema.
+3. **Still rejected:** finalization logs `[HUBSPOT-FORM-REJECTED]` and calls `upsertLeadGenContact`. That upserts the Contact by email via `/crm/v3/objects/contacts/batch/upsert`: first with every form field, then with core identity fields only. The PATCH, Note and email then carry on. The lead has no form-submission event (reporting bucket).
+4. **The outcome** is written to `prospect_data.hubspot_sync = { form: submitted|repaired|rejected, fallback: none|crm_upsert|failed, errors, at }`. If even the upsert fails, `[HUBSPOT-LEAD-LOST-RISK]` is logged.
+
 ## Tier: one value, locked once
 
 This is the most important thing on this page. The product a lead is told about is
@@ -115,7 +179,8 @@ PATCH and the note's "Service Tier Recommended" all name the stored value, so th
 disagree. (Before 2026-11-02 they came from three sources and did: the prompt's own ladder,
 `computeBestFitProduct` on the model's later range, and `determineServiceTier`, now deleted.)
 
-**When it locks.** At intake, in `runIntakeCategorization`, from the baseline estimate —
+**When it locks.** (Legacy. gg3 mode always locks at intake; see "Matcher switch".)
+At intake, in `runIntakeCategorization`, from the baseline estimate —
 unless that baseline is $0 (no rate table or no data; `isTierPendingFirstEstimate`). Then
 the key stays unset and `lockBestFitProduct` locks it in `finalizeLeadGenConversation`, i.e.
 at the model's first `save_lead_data`, from the range it saved in `estimated_funding`.
@@ -233,7 +298,8 @@ as consent. Alternatives are a recorded summary-button click or the cron's `forc
 Duplicate sends are blocked by a marker, with exactly one permitted "upgrade" send when the
 earlier one was a cron fallback and a tailored body now exists.
 
-**Partial failure** — every step degrades independently and continues: form submit, contact
+**Partial failure** — every step degrades independently and continues: form submit (now with
+retries and a direct-upsert fallback; see "HubSpot form rejections"), contact
 lookup, AI-property PATCH, company lookup, local product persist (which warns that CTA
 stripping may fall back to Natalie). **The one hard abort is booking-link routing — that
 sends no email at all.**

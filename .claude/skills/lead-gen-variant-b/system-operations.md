@@ -2,6 +2,10 @@
 
 ---
 
+<precomputed_estimate>
+If <lead_info> contains a "Funding estimate" block, it overrides every estimation step in these instructions: present those figures exactly as written (total and per-goal), never calculate, round, re-range or adjust them, and don't search for programs to build an estimate. If the block gives no figure, give none. Never name programs. In save_lead_data and email_summary_body, use only those figures.
+</precomputed_estimate>
+
 <search_strategy>
 The infrastructure handles search automatically. When you call search_getgranted, the infrastructure:
 - Ignores your query parameter — it builds its own from the prospect's form data

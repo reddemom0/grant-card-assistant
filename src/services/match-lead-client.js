@@ -9,7 +9,8 @@
  * GG3_AI_SERVICE_URL + GG3_REVIEW_FEED_TOKEN. Unset → { ok: false } with a
  * reason, never a throw.
  *
- * No callers in Stage 1. Intended for the Steph morning brief and lead triage.
+ * Callers: the Steph morning brief, and lead-gen intake in gg3 mode
+ * (src/services/lead-gen-gg3-estimate.js), which reads `estimate`.
  */
 
 export const MATCH_LEAD_TIMEOUT_MS = 15_000;
@@ -17,6 +18,7 @@ export const MATCH_LEAD_TIMEOUT_MS = 15_000;
 export const defaultMatchLeadDeps = {
   fetch: (...args) => fetch(...args),
   env: process.env
+  // timeoutMs (optional) overrides MATCH_LEAD_TIMEOUT_MS
 };
 
 /**
@@ -24,7 +26,7 @@ export const defaultMatchLeadDeps = {
  *   annual_revenue?, business_type?, description? }, passed through as is; the
  *   service normalises and reports what it dropped.
  * @returns {Promise<
- *   {ok: true, status: 'ok', grants: Array, inputs_used: object, dropped: Array} |
+ *   {ok: true, status: 'ok', grants: Array, estimate: object|null, inputs_used: object, dropped: Array} |
  *   {ok: true, status: 'insufficient_profile', grants: [], missing: string[], inputs_used: object, dropped: Array} |
  *   {ok: false, reason: string}
  * >}
@@ -39,7 +41,7 @@ export async function matchLead(lead, deps = defaultMatchLeadDeps) {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', accept: 'application/json' },
       body: JSON.stringify(lead || {}),
-      signal: AbortSignal.timeout(MATCH_LEAD_TIMEOUT_MS)
+      signal: AbortSignal.timeout(deps.timeoutMs || MATCH_LEAD_TIMEOUT_MS)
     });
     const body = await res.json().catch(() => null);
     if (!res.ok || !body) {
@@ -51,6 +53,7 @@ export async function matchLead(lead, deps = defaultMatchLeadDeps) {
         inputs_used: body.inputs_used || {}, dropped: body.dropped || [] };
     }
     return { ok: true, status: 'ok', grants: Array.isArray(body.grants) ? body.grants : [],
+      estimate: body.estimate && typeof body.estimate === 'object' ? body.estimate : null,
       inputs_used: body.inputs_used || {}, dropped: body.dropped || [] };
   } catch (err) {
     console.warn(`⚠️  match-lead failed — code: ${err?.name || err?.code || 'unknown'}`);

@@ -20,11 +20,17 @@ import {
 import {
   submitLeadGenForm,
   findContactByEmailWithRetry,
-  patchAIContactProperties
+  patchAIContactProperties,
+  upsertLeadGenContact
 } from './hubspot-form-submission.js';
 import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
 import { notifyTeamOfLead, notifyTeamOfUpgrade } from '../services/lead-notification.js';
 import { getBookingLink, NATALIE_INTRO_LINK, substituteBookingLink, BookingLinkRoutingError } from './booking-link-routing.js';
+import {
+  findForeignFigures,
+  formatEstimateRange,
+  isGg3Session
+} from '../services/lead-gen-gg3-estimate.js';
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 
@@ -483,7 +489,30 @@ function buildNoteBodyComprehensive(sessionData, trigger) {
   // FUNDING ESTIMATE
   // =========================================================================
 
-  if (estimated_funding || available_now_funding) {
+  const gg3Est = isGg3Session(pd) ? (pd.gg3_estimate || { status: 'unavailable', reason: 'not stored' }) : null;
+
+  if (gg3Est) {
+    // gg3 matcher: the stored estimate, exactly as the prospect saw it.
+    lines.push('💰 Funding Estimate (gg3 match-lead):');
+    lines.push('');
+    if (gg3Est.status === 'ok') {
+      lines.push(`Estimated Potential (12 months): ${formatEstimateRange(gg3Est)}`);
+      for (const g of gg3Est.per_goal || []) {
+        const range = formatEstimateRange(g);
+        if (range) lines.push(`  • ${g.goal}: ${range} (${g.match_count} match${g.match_count === 1 ? '' : 'es'})`);
+      }
+    } else if (gg3Est.status === 'confirm_needed') {
+      lines.push('No figure given — matching programs exist, amounts to be confirmed.');
+    } else {
+      lines.push(`No figure given — estimate ${gg3Est.status}${gg3Est.reason ? ` (${gg3Est.reason})` : ''}.`);
+    }
+    if (gg3Est.matches_used != null) lines.push(`High/medium matches: ${gg3Est.matches_used}`);
+    if (gg3Est.revenue_band_used) lines.push(`Revenue band cap: ${gg3Est.revenue_band_used}`);
+    const goalsUsed = gg3Est.inputs_used?.business_goals || [];
+    if (goalsUsed.length > 0) lines.push(`Goals matched on: ${goalsUsed.join(', ')}`);
+    for (const n of gg3Est.notes || []) lines.push(`Note: ${n}`);
+    lines.push('');
+  } else if (estimated_funding || available_now_funding) {
     lines.push('💰 Funding Estimate:');
     lines.push('');
 
@@ -526,8 +555,9 @@ function buildNoteBodyComprehensive(sessionData, trigger) {
         lines.push(`Industry Group: ${categorizationData.industry_group_label} (Group ${categorizationData.industry_group})`);
       }
 
-      // Baseline Estimate
-      if (categorizationData.baseline_estimate) {
+      // Baseline Estimate (legacy only — in gg3 mode the rate-table figure
+      // is not the lead's estimate and is not shown)
+      if (categorizationData.baseline_estimate && !gg3Est) {
         const baseline = categorizationData.baseline_estimate;
         const totalLow = Math.round(baseline.total_low / 1000);
         const totalHigh = Math.round(baseline.total_high / 1000);
@@ -733,9 +763,14 @@ function buildNoteBodyComprehensive(sessionData, trigger) {
  * @param {Object} [mergedEstimate] - Pillar-broken-down estimate object
  * @param {string} [serviceTier] - Override for pd.service_tier
  * @param {string} [bestFitProduct] - Override for pd.best_fit_product
+ * @param {Object} [gg3Estimate] - gg3 matcher only: the stored
+ *                                 prospect_data.gg3_estimate. When given, it is
+ *                                 the only source of figures (total + per goal,
+ *                                 formatEstimateRange); confirm_needed and
+ *                                 unavailable get no figure.
  * @returns {string} HTML email content
  */
-export function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null, bestFitProduct = null) {
+export function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null, bestFitProduct = null, gg3Estimate = null) {
   const pd = prospectData || {};
   const companyName = pd.company_name || 'your company';
   const activities = pd.activities || pd.activities_discussed || 'your growth plans';
@@ -798,7 +833,23 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
   let fundingSummary = '';
   let pillarBreakdown = '';
 
-  if (hasMergedEstimate) {
+  if (gg3Estimate) {
+    // gg3 matcher: the stored estimate, formatted the way chat showed it.
+    if (gg3Estimate.status === 'ok' && formatEstimateRange(gg3Estimate)) {
+      fundingSummary = `<p>Based on what you shared, you're looking at an estimated <strong>${formatEstimateRange(gg3Estimate)}</strong> over the next 12 months across multiple programs.</p>`;
+      const goals = (gg3Estimate.per_goal || []).filter((g) => formatEstimateRange(g));
+      if (goals.length > 0) {
+        pillarBreakdown = `<p>Here's the breakdown by goal:</p>
+
+<ul>
+  <li>${goals.map((g) => `<strong>${g.goal}:</strong> ${formatEstimateRange(g)}`).join('</li>\n  <li>')}</li>
+</ul>`;
+      }
+    } else if (gg3Estimate.status === 'confirm_needed') {
+      fundingSummary = `<p>Based on what you shared, there are programs that match your profile. We confirm the amounts when we review them with you.</p>`;
+    }
+    // unavailable / insufficient_profile: no estimate paragraph, no figure.
+  } else if (hasMergedEstimate) {
     // Use merged_estimate for accurate pillar-by-pillar breakdown
     const totalLow = Math.round(mergedEstimate.total_low / 1000);
     const totalHigh = Math.round(mergedEstimate.total_high / 1000);
@@ -989,6 +1040,94 @@ async function hasSummaryClick(sessionId) {
 }
 
 /**
+ * The summary email's body, before markdown conversion and booking-link
+ * substitution: the agent's email_summary_body, or the template
+ * (generateFallbackEmail) when there is none. In gg3 mode the agent's body
+ * must agree with the stored estimate (findForeignFigures), else the template.
+ * Reads the DB for the template's enriched data; sends nothing.
+ *
+ * @returns {Promise<{html: string, kind: 'agent'|'fallback'|'gg3_template'}>}
+ */
+export async function composeLeadGenEmailBody(sessionId, session, prospectData, firstName) {
+  let emailBodyHtml = prospectData.email_summary_body;
+  let emailKind = 'agent';
+
+  // gg3 matcher: the agent's body is kept only if every dollar figure in it
+  // is one of the stored ones. Otherwise the template, built from the stored
+  // estimate, goes instead. Kind 'gg3_template' is not upgrade-eligible, so
+  // the mismatched body can't ship later as an "upgrade".
+  const gg3 = isGg3Session(prospectData);
+  if (gg3 && emailBodyHtml) {
+    const foreign = findForeignFigures(emailBodyHtml, prospectData.gg3_estimate, prospectData);
+    if (foreign.length > 0) {
+      console.warn(`[ESTIMATE-MISMATCH] session=${sessionId} figures=${JSON.stringify(foreign)} — agent email body replaced by the gg3 template`);
+      emailBodyHtml = null;
+      emailKind = 'gg3_template';
+    }
+  }
+
+  if (!emailBodyHtml) {
+    if (emailKind !== 'gg3_template') emailKind = 'fallback';
+    console.log(emailKind === 'gg3_template'
+      ? '⚠️  Agent email_summary_body disagrees with the gg3 estimate — generating template email'
+      : '⚠️  No email_summary_body from agent — generating fallback email');
+
+    // Load enriched session data for accurate estimate
+    console.log(`📊 Loading enriched session data from conversation_memory...`);
+    const enrichedSession = await loadEnrichedSessionData(sessionId);
+
+    // Extract merged estimate and tier data
+    let mergedEstimate = null;
+    let serviceTier = null;
+
+    if (enrichedSession?.prospect_data?.merged_estimate) {
+      const rawEstimate = typeof enrichedSession.prospect_data.merged_estimate === 'string'
+        ? JSON.parse(enrichedSession.prospect_data.merged_estimate)
+        : enrichedSession.prospect_data.merged_estimate;
+      mergedEstimate = rawEstimate.estimate || null;
+      serviceTier = rawEstimate.service_tier || null;
+      console.log(`✅ Using merged_estimate for fallback email`);
+    }
+
+    // Fallback to categorization if merged_estimate not available
+    if (!serviceTier && enrichedSession?.prospect_data?.categorization) {
+      const categorization = typeof enrichedSession.prospect_data.categorization === 'string'
+        ? JSON.parse(enrichedSession.prospect_data.categorization)
+        : enrichedSession.prospect_data.categorization;
+      serviceTier = categorization.service_tier || null;
+    }
+
+    emailBodyHtml = generateFallbackEmail(
+      prospectData,
+      session.estimated_funding || prospectData.estimated_funding,
+      firstName,
+      mergedEstimate,
+      serviceTier,
+      prospectData.best_fit_product || null,
+      gg3 ? (prospectData.gg3_estimate || { status: 'unavailable' }) : null
+    );
+  } else {
+    console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
+
+    // Strip HTML document tags if present
+    if (emailBodyHtml.includes('<html') || emailBodyHtml.includes('<!DOCTYPE')) {
+      console.warn(`⚠️  email_summary_body contains <html> or <!DOCTYPE> tags — stripping them`);
+      emailBodyHtml = emailBodyHtml
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<html[^>]*>/gi, '')
+        .replace(/<\/html>/gi, '')
+        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+        .replace(/<body[^>]*>/gi, '')
+        .replace(/<\/body>/gi, '')
+        .trim();
+      console.log(`✅ Stripped outer tags — new length: ${emailBodyHtml.length} chars`);
+    }
+  }
+
+  return { html: emailBodyHtml, kind: emailKind };
+}
+
+/**
  * Send email summary for a lead-gen session
  *
  * This function is INDEPENDENT of finalization - it can be called multiple times.
@@ -1114,63 +1253,15 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
   const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
   const firstName = nameParts[0] || 'there';
 
-  // Get email body or generate fallback
-  let emailBodyHtml = prospectData.email_summary_body;
-  let emailKind = 'agent';
+  const composed = await composeLeadGenEmailBody(sessionId, session, prospectData, firstName);
+  let emailBodyHtml = composed.html;
+  const emailKind = composed.kind;
 
-  if (!emailBodyHtml) {
-    emailKind = 'fallback';
-    console.log('⚠️  No email_summary_body from agent — generating fallback email');
-
-    // Load enriched session data for accurate estimate
-    console.log(`📊 Loading enriched session data from conversation_memory...`);
-    const enrichedSession = await loadEnrichedSessionData(sessionId);
-
-    // Extract merged estimate and tier data
-    let mergedEstimate = null;
-    let serviceTier = null;
-
-    if (enrichedSession?.prospect_data?.merged_estimate) {
-      const rawEstimate = typeof enrichedSession.prospect_data.merged_estimate === 'string'
-        ? JSON.parse(enrichedSession.prospect_data.merged_estimate)
-        : enrichedSession.prospect_data.merged_estimate;
-      mergedEstimate = rawEstimate.estimate || null;
-      serviceTier = rawEstimate.service_tier || null;
-      console.log(`✅ Using merged_estimate for fallback email`);
-    }
-
-    // Fallback to categorization if merged_estimate not available
-    if (!serviceTier && enrichedSession?.prospect_data?.categorization) {
-      const categorization = typeof enrichedSession.prospect_data.categorization === 'string'
-        ? JSON.parse(enrichedSession.prospect_data.categorization)
-        : enrichedSession.prospect_data.categorization;
-      serviceTier = categorization.service_tier || null;
-    }
-
-    emailBodyHtml = generateFallbackEmail(
-      prospectData,
-      session.estimated_funding || prospectData.estimated_funding,
-      firstName,
-      mergedEstimate,
-      serviceTier,
-      prospectData.best_fit_product || null
-    );
-  } else {
-    console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
-
-    // Strip HTML document tags if present
-    if (emailBodyHtml.includes('<html') || emailBodyHtml.includes('<!DOCTYPE')) {
-      console.warn(`⚠️  email_summary_body contains <html> or <!DOCTYPE> tags — stripping them`);
-      emailBodyHtml = emailBodyHtml
-        .replace(/<!DOCTYPE[^>]*>/gi, '')
-        .replace(/<html[^>]*>/gi, '')
-        .replace(/<\/html>/gi, '')
-        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
-        .replace(/<body[^>]*>/gi, '')
-        .replace(/<\/body>/gi, '')
-        .trim();
-      console.log(`✅ Stripped outer tags — new length: ${emailBodyHtml.length} chars`);
-    }
+  // An upgrade exists to deliver the tailored body. If that body was refused
+  // (gg3 figure mismatch), the upgrade would only resend a template.
+  if (isUpgrade && emailKind !== 'agent') {
+    console.log(`ℹ️  Upgrade send skipped — the tailored body was not usable (${emailKind})`);
+    return { success: false, error: 'Upgrade body not usable', alreadySent: true, sentAt: prospectData.email_sent_at };
   }
 
   // Convert markdown to HTML
@@ -1499,8 +1590,38 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
 
   const formResult = await submitLeadGenForm(enrichedSession, agentInput);
   results.form = formResult.success
-    ? { action: 'submitted', fieldCount: formResult.fieldCount }
+    ? { action: formResult.repaired ? 'submitted_repaired' : 'submitted', fieldCount: formResult.fieldCount }
     : { action: 'failed', error: formResult.error };
+
+  // A rejected form must not lose the lead: upsert the Contact directly so
+  // the steps below still have a record, and record the outcome on the row.
+  const hubspotSync = {
+    form: formResult.success ? (formResult.repaired ? 'repaired' : 'submitted') : 'rejected',
+    fallback: 'none',
+    errors: formResult.success ? [] : (formResult.errors || []),
+    ...(formResult.repaired ? { repaired: formResult.repaired } : {}),
+    at: new Date().toISOString()
+  };
+  if (!formResult.success) {
+    const upsert = await upsertLeadGenContact(formResult.fields || [], hubspotClient);
+    hubspotSync.fallback = upsert.success ? 'crm_upsert' : 'failed';
+    results.form.fallback = hubspotSync.fallback;
+    if (upsert.success) {
+      console.error(`[HUBSPOT-FORM-REJECTED] session=${sessionId} — lead kept via direct contact upsert (${upsert.properties} fields); no form-submission event recorded`);
+    } else {
+      console.error(`[HUBSPOT-LEAD-LOST-RISK] session=${sessionId} email=${session.contact_email} — form rejected AND contact upsert failed: ${upsert.error}`);
+    }
+  }
+  try {
+    await query(
+      `UPDATE lead_gen_conversations
+       SET prospect_data = prospect_data || $1::jsonb
+       WHERE session_id = $2`,
+      [JSON.stringify({ hubspot_sync: hubspotSync }), sessionId]
+    );
+  } catch (err) {
+    console.error(`[HUBSPOT-SYNC-RECORD-FAIL] session=${sessionId} err=${err.message} sync=${JSON.stringify(hubspotSync)}`);
+  }
 
   // -------------------------------------------------------------------------
   // 5. Find Contact ID (search by email + retry for eventual-consistency window)
@@ -1532,9 +1653,28 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
 
   // Locked in step 1 — read back, never recomputed from this call's estimate.
   const bestFitProduct  = prospectData.best_fit_product;
-  const emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
-                           enrichedSession.prospect_data?.email_summary_body ||
-                           null;
+  let emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
+                         enrichedSession.prospect_data?.email_summary_body ||
+                         null;
+
+  // gg3 matcher: HubSpot gets the body the prospect would be emailed (the
+  // agent's, if its figures match the stored estimate, else the template),
+  // plus the estimate itself in grant_calc_min / grant_calc_max.
+  const gg3Session = isGg3Session(prospectData);
+  let grantCalc = null;
+  if (gg3Session) {
+    if (emailSummaryBody) {
+      const firstName = (session.contact_name || 'there').trim().split(/\s+/)[0] || 'there';
+      const composed = await composeLeadGenEmailBody(
+        sessionId, session, { ...prospectData, ...enrichedSession.prospect_data, email_summary_body: emailSummaryBody }, firstName
+      );
+      emailSummaryBody = composed.html;
+    }
+    const est = prospectData.gg3_estimate;
+    if (est?.status === 'ok' && est.low != null && est.high != null) {
+      grantCalc = { min: est.low, max: est.high };
+    }
+  }
 
   enrichedSession.best_fit_product = bestFitProduct;
   enrichedSession.prospect_data = enrichedSession.prospect_data || {};
@@ -1557,7 +1697,8 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
       {
         bestFitProduct,
         emailSummaryBody,
-        marketingOptIn: enrichedSession.prospect_data?.marketing_opt_in || 'false'
+        marketingOptIn: enrichedSession.prospect_data?.marketing_opt_in || 'false',
+        ...(grantCalc ? { grantCalcMin: grantCalc.min, grantCalcMax: grantCalc.max } : {})
       },
       hubspotClient
     );

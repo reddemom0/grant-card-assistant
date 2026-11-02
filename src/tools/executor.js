@@ -293,15 +293,23 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                 : input.key;
 
               // JSONB merge: preserve existing fields, add/update this field
-              await dbQuery(
+              // gg3 matcher: the funding fields come from the stored gg3
+              // estimate only, never from the model (docs/lead-gen.md).
+              const isFundingKey = ['estimated_funding', 'available_now_funding', 'programs_matched_count'].includes(input.key);
+              const upd = await dbQuery(
                 `UPDATE lead_gen_conversations
                  SET prospect_data = prospect_data || $1::jsonb,
                      updated_at = NOW()
-                 WHERE session_id = $2`,
+                 WHERE session_id = $2${isFundingKey ? `
+                   AND COALESCE(prospect_data->>'lead_gen_matcher', '') <> 'gg3'` : ''}`,
                 [JSON.stringify({ [fieldName]: input.value }), conversationId]
               );
 
-              console.log(`✓ Prospect data updated: ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)}`);
+              if (isFundingKey && upd?.rowCount === 0) {
+                console.log(`ℹ️  gg3 matcher: ignored model-written ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)} (stored gg3 estimate stands)`);
+              } else {
+                console.log(`✓ Prospect data updated: ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)}`);
+              }
             } catch (err) {
               console.warn(`⚠️  Failed to update prospect_data for ${input.key}:`, err.message);
             }
@@ -884,6 +892,22 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         let categorization = null;
         let mergedEstimate = null;
         let usedFocusedSearch = false;
+
+        // gg3 matcher: the tool isn't offered (getToolsForAgent), but a gg3
+        // session can still meet it if the env flips back mid-session. Its
+        // writes would replace the session's estimate memory, so refuse.
+        if (agentType === 'lead-gen' && conversationId) {
+          const { query: dbQuery } = await import('../database/connection.js');
+          const pdRow = await dbQuery(
+            `SELECT prospect_data->>'lead_gen_matcher' AS matcher FROM lead_gen_conversations WHERE session_id = $1`,
+            [conversationId]
+          );
+          if (pdRow.rows[0]?.matcher === 'gg3') {
+            console.log('ℹ️  search_getgranted refused for a gg3-matcher session');
+            result = { success: false, error: 'Not available: the funding estimate for this lead is already computed (see lead_info). Use those figures and do not name programs.' };
+            break;
+          }
+        }
 
         if (agentType === 'lead-gen' && conversationId) {
           console.log('\n🏗️  INFRASTRUCTURE-ENHANCED SEARCH STARTING...');

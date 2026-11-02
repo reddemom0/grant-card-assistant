@@ -28,7 +28,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logAPICost } from '../utils/cost-logger.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
 import { buildProspectDataFromForm } from '../services/build-prospect-data.js';
-import { computeBestFitProduct, isTierPendingFirstEstimate } from './lead-gen-helpers.js';
+import { computeBestFitProduct, computeGg3BestFitProduct, isTierPendingFirstEstimate } from './lead-gen-helpers.js';
+import { currentLeadGenMatcher, estimatedFundingFromGg3, fetchLeadGenEstimate } from '../services/lead-gen-gg3-estimate.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -117,7 +118,10 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
     expansion_budget: formData.expansion_budget,
     planned_activities: formData.planned_activities,
     referral_source: formData.referral_source,
-    marketing_opt_in: formData.marketing_opt_in || 'false'
+    marketing_opt_in: formData.marketing_opt_in || 'false',
+    // The matcher is decided once, here, and read from the session after.
+    // Legacy sessions omit the key, as every session before the switch did.
+    ...(currentLeadGenMatcher() === 'gg3' ? { lead_gen_matcher: 'gg3' } : {})
   };
 
   // Create the lead-gen-specific metadata row with form data
@@ -183,7 +187,10 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
  * Monitor via the blast-radius query on empty best_fit_product as an ongoing
  * canary.
  */
-async function runIntakeCategorization(sessionId, prospectDataFromForm) {
+export async function runIntakeCategorization(sessionId, prospectDataFromForm) {
+  if (prospectDataFromForm.lead_gen_matcher === 'gg3') {
+    return runGg3IntakeCategorization(sessionId, prospectDataFromForm);
+  }
   try {
     console.log('\n🏷️  INTAKE CATEGORIZATION STARTING...');
 
@@ -285,6 +292,101 @@ async function runIntakeCategorization(sessionId, prospectDataFromForm) {
     console.error(
       `[INTAKE-CATEGORIZATION-FAIL] session=${sessionId} err=${err.message} — session created without categorization; search-handler will populate if agent searches, otherwise finalization will see empty fields.`
     );
+    if (err.stack) console.error(err.stack);
+  }
+}
+
+/**
+ * Intake for a gg3-mode session (LEAD_GEN_MATCHER=gg3).
+ *
+ * The estimate is gg3's match-lead `estimate` block, stored on
+ * prospect_data.gg3_estimate and read by every surface after (chat, email,
+ * HubSpot). categorizeProspect still runs, for service_tier (the not_a_fit
+ * rules in tier-rules.json) and the consultant; its rate-table baseline is
+ * not shown anywhere.
+ *
+ * The tier always locks here (computeGg3BestFitProduct): on estimate.low when
+ * the status is ok, otherwise on the size rule alone. A failed categorization
+ * or a failed match-lead call still locks a tier, so the lead never reaches
+ * the chat without one.
+ */
+async function runGg3IntakeCategorization(sessionId, prospectDataFromForm) {
+  console.log('\n🏷️  INTAKE CATEGORIZATION STARTING (matcher: gg3)...');
+
+  const [categorizationResult, estimate] = await Promise.all([
+    categorizeProspect(buildProspectDataFromForm(prospectDataFromForm), { skipHaiku: true })
+      .then((c) => ({ ok: true, c }))
+      .catch((err) => ({ ok: false, err })),
+    fetchLeadGenEstimate(prospectDataFromForm)
+  ]);
+
+  if (estimate.status === 'unavailable') {
+    console.error(`[LEAD-GEN-GG3-ESTIMATE-FAIL] session=${sessionId} reason="${estimate.reason}" — size-based tier, no figure shown`);
+  } else {
+    console.log(`  gg3 estimate: status=${estimate.status} low=${estimate.low} high=${estimate.high} goals=${JSON.stringify(estimate.inputs_used?.business_goals || [])} dropped=${JSON.stringify((estimate.dropped || []).map((d) => d.field))}`);
+  }
+
+  let categorization = null;
+  if (categorizationResult.ok) {
+    categorization = categorizationResult.c;
+  } else {
+    console.error(`[INTAKE-CATEGORIZATION-FAIL] session=${sessionId} err=${categorizationResult.err?.message} — gg3 mode: locking a tier without service_tier`);
+  }
+
+  const serviceTier = categorization?.service_tier || null;
+  const estimatedFunding = estimatedFundingFromGg3(estimate);
+  const bestFitProduct = computeGg3BestFitProduct(
+    { ...prospectDataFromForm, service_tier: serviceTier },
+    estimatedFunding
+  );
+
+  try {
+    if (categorization) {
+      // Same memory rows as the legacy intake, for readers that expect them.
+      // The merged_estimate carries no rate-table figures in gg3 mode.
+      const mergedEstimate = {
+        estimate: null,
+        confidence_level: null,
+        service_tier: serviceTier,
+        tier_reasoning: categorization.tier_reasoning,
+        consultant_assignment: categorization.consultant_assignment,
+        booking_link: categorization.booking_link,
+        agent_talking_points: [],
+        programs_for_hubspot: [],
+        matched_programs_detail: []
+      };
+      await query(
+        `INSERT INTO conversation_memory (conversation_id, key, value)
+         VALUES ($1, 'categorization', $2)
+         ON CONFLICT (conversation_id, key)
+         DO UPDATE SET value = $2`,
+        [sessionId, JSON.stringify(categorization)]
+      );
+      await query(
+        `INSERT INTO conversation_memory (conversation_id, key, value)
+         VALUES ($1, 'merged_estimate', $2)
+         ON CONFLICT (conversation_id, key)
+         DO UPDATE SET value = $2`,
+        [sessionId, JSON.stringify(mergedEstimate)]
+      );
+    }
+
+    const patch = {
+      gg3_estimate: estimate,
+      best_fit_product: bestFitProduct,
+      ...(serviceTier ? { service_tier: serviceTier } : {}),
+      ...(estimatedFunding ? { estimated_funding: estimatedFunding } : {})
+    };
+    await query(
+      `UPDATE lead_gen_conversations
+       SET prospect_data = prospect_data || $1::jsonb
+       WHERE session_id = $2`,
+      [JSON.stringify(patch), sessionId]
+    );
+
+    console.log(`✅ INTAKE CATEGORIZATION COMPLETE (gg3) — tier=${serviceTier ?? '(none)'}, best_fit=${bestFitProduct}, estimate=${estimatedFunding ?? `(no figure: ${estimate.status})`}\n`);
+  } catch (err) {
+    console.error(`[INTAKE-CATEGORIZATION-FAIL] session=${sessionId} err=${err.message} — gg3 intake could not be stored`);
     if (err.stack) console.error(err.stack);
   }
 }

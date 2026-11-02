@@ -6,6 +6,7 @@
 
 import { query } from '../database/connection.js';
 import { lookupRangeMap } from './hubspot-form-mappings.js';
+import { isGg3Session, pinFundingToGg3 } from '../services/lead-gen-gg3-estimate.js';
 
 /**
  * Load enriched session data for comprehensive note building
@@ -72,6 +73,16 @@ export async function loadEnrichedSessionData(sessionId) {
   });
 
   console.log(`✓ Loaded enriched session data: ${memoryResult.rows.length} memory_store items`);
+
+  // gg3 matcher: memory_store rows and the estimated_funding column can hold
+  // model text. Every reader of this (form, note, fallback email) gets the
+  // stored gg3 estimate instead.
+  if (isGg3Session(enrichedSession.prospect_data)) {
+    for (const c of pinFundingToGg3(enrichedSession, enrichedSession.prospect_data.gg3_estimate)) {
+      console.log(`ℹ️  gg3 matcher: ${c.field} pinned to the stored estimate (was ${JSON.stringify(c.from)})`);
+    }
+    enrichedSession.prospect_data.estimated_funding = enrichedSession.estimated_funding;
+  }
 
   return enrichedSession;
 }
@@ -341,6 +352,28 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   // here by design — a lead that should be Pro cleared the gate above.
   if (fundingNum !== null && fundingNum >= STARTER_MIN_ESTIMATE) return 'Granted Starter';
   return 'Get Granted';
+}
+
+/**
+ * The intake tier for a gg3-mode session (LEAD_GEN_MATCHER=gg3). Always
+ * decided at intake, never pending.
+ *
+ *   - gg3 estimate status "ok" → computeBestFitProduct on the estimate,
+ *     formatted with its exact low first, so the $15,000 Starter threshold
+ *     reads estimate.low.
+ *   - anything else (confirm_needed, insufficient_profile, unavailable,
+ *     timeout) → computeBestFitProduct with no estimate, which is the size
+ *     rule alone: Pro gate → Granted Pro, else Get Granted.
+ *
+ * Nonprofit and not_a_fit win either way; the rules are computeBestFitProduct's.
+ *
+ * @param {Object} prospectData - form fields plus service_tier
+ * @param {string|null} estimatedFunding - estimatedFundingFromGg3(estimate)
+ * @returns {'Granted Pro'|'Granted Starter'|'Get Granted'|'Nonprofit'}
+ */
+export function computeGg3BestFitProduct(prospectData, estimatedFunding) {
+  const { estimated_funding: _ignored, ...pd } = prospectData || {};
+  return computeBestFitProduct({ prospect_data: pd, estimated_funding: estimatedFunding || null }, null);
 }
 
 // ============================================================================

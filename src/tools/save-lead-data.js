@@ -17,6 +17,7 @@
 
 import { query } from '../database/connection.js';
 import { finalizeLeadGenConversation } from '../api/lead-gen-finalization.js';
+import { isGg3Session, pinFundingToGg3 } from '../services/lead-gen-gg3-estimate.js';
 
 // ============================================================================
 // Main export
@@ -126,6 +127,28 @@ export async function saveLeadData(input, conversationId) {
     });
   } catch (err) {
     console.warn(`⚠️  Failed to load memory_store overrides (will use agent values):`, err.message);
+  }
+
+  // -------------------------------------------------------------------------
+  // 0b. gg3 matcher: funding fields come from the stored gg3 estimate only,
+  //     whatever the model or memory_store said. matched_programs (internal,
+  //     HubSpot note) are gg3's top cards, since there is no search.
+  // -------------------------------------------------------------------------
+  try {
+    const pdRow = await query(
+      `SELECT prospect_data FROM lead_gen_conversations WHERE session_id = $1`,
+      [conversationId]
+    );
+    const storedPd = pdRow.rows[0]?.prospect_data;
+    if (isGg3Session(storedPd)) {
+      for (const c of pinFundingToGg3(input, storedPd.gg3_estimate)) {
+        console.log(`✅ ${c.field} pinned to the gg3 estimate (agent/memory: ${JSON.stringify(c.from)}, stored: ${JSON.stringify(c.to)})`);
+      }
+      const cards = (storedPd.gg3_estimate?.cards || []).map((c) => c.name).filter(Boolean);
+      input.matched_programs = cards;
+    }
+  } catch (err) {
+    console.warn(`⚠️  gg3 estimate pin failed (agent values stand):`, err.message);
   }
 
   // -------------------------------------------------------------------------

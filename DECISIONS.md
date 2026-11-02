@@ -12,6 +12,33 @@ Format:
 
 ---
 
+## 2026-11-02 — Lead-gen `LEAD_GEN_MATCHER=gg3`: one stored gg3 estimate for chat, email and HubSpot
+**What:** With `LEAD_GEN_MATCHER=gg3`, `/init` calls gg3 match-lead (8 s timeout) and stores its `estimate` block on `prospect_data.gg3_estimate`. Chat (`<lead_info>`), the summary email and HubSpot (Note, `email_summary_body`, new `grant_calc_min/max`) all show exactly that estimate, formatted by one function (`formatEstimateRange`). Goals come from the widget (Chris, 2026-11-02):
+- Training Budget → Hire or Train People.
+- Market Expansion budget → International Growth.
+- Free text → passed to gg3's own cues.
+- Hiring Plans → never a goal.
+
+The tier always locks at intake. On status ok, `computeBestFitProduct` reads `estimate.low`; otherwise it applies the size rule alone (Pro gate → Granted Pro, else Get Granted). The model can't change a figure:
+- `search_getgranted` is dropped, and strategic context is skipped.
+- `memory_store` and `save_lead_data` funding writes are pinned to the stored value.
+- An email body with any other figure is replaced by the template (`[ESTIMATE-MISMATCH]`).
+
+The mode is sticky per session (`prospect_data.lead_gen_matcher`). Legacy stays the default, and its intake, `<lead_info>` and loadout were verified byte-identical to HEAD.
+
+Same change set: a rejected HubSpot form no longer loses the lead.
+- Transient failures are retried.
+- A `website` error is retried once with the email domain.
+- Otherwise the contact is upserted directly.
+- The outcome goes on `prospect_data.hubspot_sync`, with `[HUBSPOT-FORM-REJECTED]` / `[HUBSPOT-LEAD-LOST-RISK]` logs.
+
+**Why:** Three sources (rate tables, the model's maths, the GG1 search) produced the figures, and the surfaces could disagree. gg3's estimate is deterministic and shared with the new website. Email is validated rather than always templated (Chris), so tailored bodies survive when they agree.
+**Open:**
+- gg3 figures run high for small leads: AB construction under $500K came out $50K–$250K, and BC food processing came out $250K–$360K "International Growth" (see gg3-ai-service DECISIONS 2026-11-02 on off-target bases).
+- A goal-less lead gets no figure.
+- The forms token lacks the forms scope, so "website is required" is inferred, not confirmed.
+**Impact:** new `src/services/lead-gen-gg3-estimate.js`; `src/services/match-lead-client.js` (`estimate`, `timeoutMs`), `src/api/lead-gen-init.js`, `src/api/lead-gen-helpers.js` (`computeGg3BestFitProduct`, enriched-session pin), `src/utils/lead-gen-context.js`, `src/tools/{definitions,executor,save-lead-data}.js`, `src/api/lead-gen-finalization.js` (`composeLeadGenEmailBody`, gg3 template/note, form fallback), `src/api/hubspot-form-submission.js` (retries, `upsertLeadGenContact`, `grant_calc_*`), one rule in each of `.claude/agents/lead-gen.md` and `.claude/skills/lead-gen-variant-b/system-operations.md`, `.env.example`, `docs/lead-gen.md`; tests `lead-gen-gg3-estimate`, `lead-gen-gg3-surfaces`, `hubspot-form-reliability`, `match-lead-client`.
+
 ## 2026-11-02 — Lead-gen summaries: the cron delivers to quiet visitors, click or no click
 **What:** The inactivity cron delivers a stored `email_summary_body` to a visitor who went quiet, whether or not they clicked the summary button (Chris, 2026-11-02). `finalizeInactiveSessions` no longer returns early on an empty batch, so `deliverPendingSummaries` runs on every tick. Same change set: the four functions in `scripts/create-search-function.js` release their DB client in `finally`, so a search error reaches the agent as `{ success: false }` instead of hanging the chat.
 **Why:** The cron had effectively become click-required. Production 2026-11-02: in ~29h of logs, all 176 ticks found no idle unfinalized session and returned before the sweep. Over 14 days, 10 summaries (9 visitors, 20–30 Oct, none clicked) were stranded past the 24h cutoff. They stay unsent (Chris): unrequested and 3–13 days late, which is what the stale-lead rule exists to prevent. This reverses the click-required behaviour in practice, though not on paper: the 2026-07-30 entry already authorized click, `cta_selected`, **or** the cron, and added `deliverPendingSummaries` for exactly these sessions. This entry confirms that design was intended. The search hang was latent (0 search errors in the same logs).
