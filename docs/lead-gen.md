@@ -248,6 +248,12 @@ complete with partial HubSpot state and no automatic retry.
 selects unfinalized sessions inactive >5 minutes with a company name and at least one
 message, oldest first, capped at 50.
 
+`deliverPendingSummaries` runs on **every** tick, including when no session was finalized.
+It sends the stored summary to already-finalized sessions that went quiet 5 minutes to 24
+hours ago and were never emailed, click or no click (the cron is an authorization path in
+`sendLeadGenEmail`). Older ones are logged as `[PENDING-SUMMARY-STALE]` and never sent.
+Until Nov 2026 an empty batch returned early and skipped it, so it rarely ran.
+
 A comment records a past incident: email generation used to live in the cron loop and
 produced mis-routed Starter pitches to `not_a_fit` leads. It is now consolidated inside
 `finalizeLeadGenConversation`.

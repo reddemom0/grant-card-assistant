@@ -55,9 +55,10 @@ async function searchGrants({
   maxResults = 50
 }) {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  let client;
 
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
 
     // Tokenise keywords into individual words
     const tokens = tokeniseKeywords(keywords);
@@ -186,7 +187,6 @@ async function searchGrants({
     `;
 
     const result = await client.query(sql, params);
-    client.release();
 
     const rankMethod = tokens.length > 0 ? 'keyword-match-count+recency' : 'recency';
     console.log(`✅ searchGrants: ${result.rows.length} results (tokens: [${tokens.join(', ')}], ranked by ${rankMethod})`);
@@ -201,6 +201,10 @@ async function searchGrants({
     console.error('❌ searchGrants error:', error);
     throw error;
   } finally {
+    // Release on every path: pool.end() waits for checked-out clients, so a
+    // client left out on a query error hung the caller (and the visitor's
+    // chat) forever.
+    client?.release();
     await pool.end();
   }
 }
@@ -260,9 +264,10 @@ const INDUSTRY_FORM_TO_DB = {
  */
 async function searchByGenreScores(province, smartFilterWeights = {}, maxResults = 15, industry = null) {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  let client;
 
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
 
     // Build weighted score expression using smart filter weights
     const weights = {
@@ -362,7 +367,6 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
     params.push(maxResults);
 
     const result = await client.query(sql, params);
-    client.release();
 
     console.log(`✅ searchByGenreScores: ${result.rows.length} results (province: ${province}, filters: ${Object.keys(smartFilterWeights).length})`);
     console.log(`   Top 3 relevance scores: ${result.rows.slice(0, 3).map(r => `${r.grant_name}: ${r.relevance_score}`).join(', ')}`);
@@ -377,6 +381,7 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
     console.error('❌ searchByGenreScores error:', error);
     throw error;
   } finally {
+    client?.release();
     await pool.end();
   }
 }
@@ -386,15 +391,16 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
  */
 async function getGrantById(grantId) {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     const result = await client.query('SELECT * FROM grants WHERE grant_id = $1', [grantId]);
-    client.release();
     return result.rows[0] || null;
   } catch (error) {
     console.error('getGrantById error:', error);
     throw error;
   } finally {
+    client?.release();
     await pool.end();
   }
 }
@@ -404,8 +410,9 @@ async function getGrantById(grantId) {
  */
 async function getGrantStats() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
 
     const [totalResult, activeResult, inactiveResult, acceptingResult, typeResult, staleness] =
       await Promise.all([
@@ -433,8 +440,6 @@ async function getGrantStats() {
         `)
       ]);
 
-    client.release();
-
     return {
       total: parseInt(totalResult.rows[0].count),
       is_active_true: parseInt(activeResult.rows[0].count),
@@ -448,6 +453,7 @@ async function getGrantStats() {
     console.error('getGrantStats error:', error);
     throw error;
   } finally {
+    client?.release();
     await pool.end();
   }
 }

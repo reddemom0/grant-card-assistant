@@ -1638,6 +1638,7 @@
           <div class="gg-form-field">
             <label for="gg-contact-email">Email <span class="required">*</span></label>
             <input type="email" id="gg-contact-email" required />
+            <div class="gg-form-hint">We’ll email you a copy of your estimate.</div>
             <span class="error-message">Please enter a valid email address</span>
           </div>
 

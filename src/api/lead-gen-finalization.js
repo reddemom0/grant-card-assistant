@@ -1775,15 +1775,16 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
     );
 
     const sessions = result.rows;
+    const results = { processed: 0, finalized: 0, errors: 0 };
 
+    // No early return: the pending-summary sweep below must run on every
+    // tick. Its sessions are already finalized, so they never show up here —
+    // returning on an empty batch stranded their summaries (Nov 2026).
     if (sessions.length === 0) {
       console.log('✓ No inactive sessions found');
-      return { processed: 0, finalized: 0, errors: 0 };
+    } else {
+      console.log(`Found ${sessions.length} inactive session(s) to finalize`);
     }
-
-    console.log(`Found ${sessions.length} inactive session(s) to finalize`);
-
-    const results = { processed: 0, finalized: 0, errors: 0 };
 
     for (const session of sessions) {
       results.processed++;
