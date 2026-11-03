@@ -31,6 +31,13 @@ describe('exclusions', () => {
     expect(ex('Departments/Sales/Leadership', 'Notes.docx')).toBeNull();
   });
 
+  test('top-level Pre-Call Briefings and everything under it (RAG only)', () => {
+    expect(ex('Pre-Call Briefings', 'Acme.docx')).toBe('area:Pre-Call Briefings');
+    expect(ex('Pre-Call Briefings/2026/Nov', 'Acme.pdf')).toBe('area:Pre-Call Briefings');
+    expect(ex('pre-call briefings', 'Acme.docx')).toBe('area:pre-call briefings');
+    expect(ex('Clients/Acme/General/Pre-Call Briefings', 'Notes.docx')).toBeNull();
+  });
+
   test('filing sweep list is unchanged', () => {
     expect(EXCLUDED_DEPARTMENTS.has(folderKey('LEADERSHIP'))).toBe(false);
   });
