@@ -7,6 +7,8 @@
 
 import { exclusionReason } from '../../src/services/rag/exclude.js';
 import { pathMeta } from '../../src/services/rag/path-meta.js';
+import { EXCLUDED_DEPARTMENTS } from '../../src/services/filing-rules.js';
+import { folderKey } from '../../src/tools/google-drive.js';
 
 const ex = (path, name = 'Application Document-Acme-CanEx.pdf') => exclusionReason({ path: path.split('/').filter(Boolean), name });
 const meta = (path) => pathMeta(path.split('/').filter(Boolean), { programSet: new Set(['canexport', 'etg', 'bcafe']) });
@@ -19,6 +21,18 @@ describe('exclusions', () => {
     ['Departments/hr/old', 'area:Departments/hr']
   ])('department area %s', (path, reason) => {
     expect(ex(path, 'Notes.docx')).toBe(reason);
+  });
+
+  test('Departments/LEADERSHIP and everything under it (RAG only)', () => {
+    expect(ex('Departments/LEADERSHIP', 'Notes.docx')).toBe('area:Departments/LEADERSHIP');
+    expect(ex('Departments/LEADERSHIP/Strategy/2026', 'Plan.pdf')).toBe('area:Departments/LEADERSHIP');
+    expect(ex('Departments/Leadership/old', 'Notes.docx')).toBe('area:Departments/Leadership');
+    expect(ex('Clients/Leadership Co/CanExport/2026')).toBeNull();
+    expect(ex('Departments/Sales/Leadership', 'Notes.docx')).toBeNull();
+  });
+
+  test('filing sweep list is unchanged', () => {
+    expect(EXCLUDED_DEPARTMENTS.has(folderKey('LEADERSHIP'))).toBe(false);
   });
 
   test('sensitive name', () => {
