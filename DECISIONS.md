@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-11-03 — Lead-gen forwards budgets to gg3 match-lead
+**What:** `buildMatchLeadInput` now sends `training_budget`, `expansion_budget` and `hiring_plans` as the raw widget strings (en dashes intact), or `null` when unset. Goal mapping (`mapWidgetToGoals`) is unchanged.
+**Why:** gg3 match-lead caps estimate goal totals by these budgets. gg3 owns the cap rules (see gg3-ai-service DECISIONS.md, 2026-11-03), and lead-gen only forwards the fields.
+**Impact:** `src/services/lead-gen-gg3-estimate.js`, gg3 mode only. The stored `gg3_estimate.request` now carries the three keys.
+
 ## 2026-11-02 — Lead-gen `LEAD_GEN_MATCHER=gg3`: one stored gg3 estimate for chat, email and HubSpot
 **What:** With `LEAD_GEN_MATCHER=gg3`, `/init` calls gg3 match-lead (8 s timeout) and stores its `estimate` block on `prospect_data.gg3_estimate`. Chat (`<lead_info>`), the summary email and HubSpot (Note, `email_summary_body`, new `grant_calc_min/max`) all show exactly that estimate, formatted by one function (`formatEstimateRange`). Goals come from the widget (Chris, 2026-11-02):
 - Training Budget → Hire or Train People.

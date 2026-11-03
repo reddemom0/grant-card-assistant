@@ -76,7 +76,12 @@ export function buildMatchLeadInput(prospectData) {
     industry: pd.industry || undefined,
     business_goals: mapWidgetToGoals(pd),
     employee_count: employeesForMatchLead(pd.employee_count),
-    annual_revenue: pd.revenue_range || undefined
+    annual_revenue: pd.revenue_range || undefined,
+    // Raw widget strings (en dashes intact) for gg3's budget caps; gg3 owns
+    // the rules (gg3-ai-service DECISIONS.md, 2026-11-03). null when unset.
+    training_budget: pd.training_budget ?? null,
+    expansion_budget: pd.expansion_budget ?? null,
+    hiring_plans: pd.hiring_plans ?? null
   };
   for (const k of Object.keys(input)) if (input[k] === undefined) delete input[k];
   return input;

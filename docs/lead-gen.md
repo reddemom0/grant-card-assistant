@@ -126,6 +126,7 @@ that is offered `search_getgranted` anyway gets a refusal from the executor.
   - Market Expansion budget → International Growth.
   - `planned_activities` free text → passed as-is; gg3's own cue table maps it.
   - **Hiring Plans is never a goal source.**
+- **Budgets** (since 2026-11-03): `training_budget`, `expansion_budget` and `hiring_plans` are also sent as the raw widget strings, en dashes intact, or `null` when unset. gg3 uses them to cap goal totals and owns the cap rules (gg3-ai-service DECISIONS.md, 2026-11-03). Lead-gen does no capping of its own.
 - **Province:** the widget's comma-joined list is split. "Just me" → 1.
 - **Stored on `prospect_data.gg3_estimate`:** `{ status, low, high, per_goal, matches_used, revenue_band_used, notes, inputs_used, dropped, cards }`, where status is `ok | confirm_needed | insufficient_profile | unavailable`. `cards` holds gg3's top-5 names and providers, for the internal Note only. Failure or timeout → `unavailable`, logged `[LEAD-GEN-GG3-ESTIMATE-FAIL]`.
 - **Tier — always locked here, never pending** (`computeGg3BestFitProduct`):

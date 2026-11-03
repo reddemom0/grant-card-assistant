@@ -76,14 +76,27 @@ describe('buildMatchLeadInput', () => {
       employee_count: '20 – 49', revenue_range: '$2.5M – $5M', training_budget: '$10K – $25K'
     })).toEqual({
       province: ['British Columbia', 'Alberta'], industry: 'Food Processing',
-      business_goals: ['Hire or Train People'], employee_count: '20 – 49', annual_revenue: '$2.5M – $5M'
+      business_goals: ['Hire or Train People'], employee_count: '20 – 49', annual_revenue: '$2.5M – $5M',
+      training_budget: '$10K – $25K', expansion_budget: null, hiring_plans: null
     });
   });
   test('"Just me" → 1, since gg3 cannot read it', () => {
     expect(buildMatchLeadInput({ province: 'Ontario', industry: 'Retail', employee_count: 'Just me' }).employee_count).toBe(1);
   });
-  test('missing fields are left out, not sent as undefined', () => {
-    expect(buildMatchLeadInput({ province: 'Ontario' })).toEqual({ province: ['Ontario'], business_goals: [] });
+  test('budgets and hiring plans go to gg3 as the raw widget strings, en dashes intact', () => {
+    const input = buildMatchLeadInput({
+      province: 'Manitoba', industry: 'Food Processing',
+      training_budget: 'Under $10K', expansion_budget: '$25K – $50K', hiring_plans: 'Not hiring right now'
+    });
+    expect(input).toMatchObject({
+      training_budget: 'Under $10K', expansion_budget: '$25K – $50K', hiring_plans: 'Not hiring right now'
+    });
+    expect(input.expansion_budget).toContain('–');
+  });
+  test('optional profile fields are left out; unset budgets and hiring plans are sent as null', () => {
+    expect(buildMatchLeadInput({ province: 'Ontario' })).toEqual({
+      province: ['Ontario'], business_goals: [], training_budget: null, expansion_budget: null, hiring_plans: null
+    });
   });
 });
 
