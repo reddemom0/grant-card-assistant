@@ -388,7 +388,8 @@ export async function runAgent({
     // ============================================================================
 
     console.log(`🧠 Loading conversation memories...`);
-    const memories = await loadConversationMemories(conversationId);
+    // Lead-gen: strip booking URLs so the model only ever writes {{BOOKING_LINK}}.
+    const memories = await loadConversationMemories(conversationId, { redactBookingUrls: agentType === 'lead-gen' });
     if (memories) {
       const memoryCount = memories.split('\n').length - 2; // Subtract header lines
       console.log(`✓ Loaded ${memoryCount} memories into context`);
@@ -487,7 +488,7 @@ export async function runAgent({
     let conversationMemoriesObject = null;
     if (agentType === 'lead-gen') {
       const { listMemories } = await import('../tools/memory.js');
-      const memoriesResult = await listMemories(conversationId);
+      const memoriesResult = await listMemories(conversationId, { redactBookingUrls: true });
       if (memoriesResult.success && memoriesResult.memories.length > 0) {
         // Convert array of {key, value} to object {key: value}
         conversationMemoriesObject = {};

@@ -223,7 +223,8 @@ const subCases = [
     text: 'Hit the summary button for next steps. {{BOOKING_LINK}}',
     routing: { best_fit_product: 'Get Granted', industry: 'Accounting' },
     opts: { mode: 'chat' },
-    expect: 'Hit the summary button for next steps. '
+    // The sentence holding the link goes with it; the line end is trimmed.
+    expect: 'Hit the summary button for next steps.'
   },
   {
     name: 'Get Granted + legacy hardcoded URL also stripped (email, no sentinel)',

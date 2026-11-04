@@ -40,6 +40,7 @@ import * as programCards from '../utils/program-cards.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
 import { runFocusedSearch } from '../services/grant-search-pipeline.js';
 import { buildProspectDataFromForm } from '../services/build-prospect-data.js';
+import { omitBookingLinks } from '../utils/booking-urls.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -362,11 +363,12 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       case 'memory_recall':
-        result = await memory.recallMemory(conversationId, input.key);
+        // Lead-gen never sees a real booking URL (it writes {{BOOKING_LINK}}).
+        result = await memory.recallMemory(conversationId, input.key, { redactBookingUrls: agentType === 'lead-gen' });
         break;
 
       case 'memory_list':
-        result = await memory.listMemories(conversationId);
+        result = await memory.listMemories(conversationId, { redactBookingUrls: agentType === 'lead-gen' });
         break;
 
       // ============================================================================
@@ -975,7 +977,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                   matched_programs_detail: searchResults.programs_found
                 };
 
-                // Step 5: Store in conversation_memory
+                // Step 5: Store in conversation_memory, minus booking links.
+                // Memory is injected into the model's prompt every turn, and
+                // the model must only ever write {{BOOKING_LINK}}. Routing
+                // never reads links from here; it calls getBookingLink.
                 const { query: dbQuery } = await import('../database/connection.js');
 
                 await dbQuery(
@@ -983,7 +988,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                    VALUES ($1, 'categorization', $2)
                    ON CONFLICT (conversation_id, key)
                    DO UPDATE SET value = $2`,
-                  [conversationId, JSON.stringify(categorization)]
+                  [conversationId, JSON.stringify(omitBookingLinks(categorization))]
                 );
 
                 await dbQuery(
@@ -991,7 +996,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                    VALUES ($1, 'merged_estimate', $2)
                    ON CONFLICT (conversation_id, key)
                    DO UPDATE SET value = $2`,
-                  [conversationId, JSON.stringify(mergedEstimate)]
+                  [conversationId, JSON.stringify(omitBookingLinks(mergedEstimate))]
                 );
 
                 console.log('  ✅ Stored categorization + merged_estimate in conversation_memory');

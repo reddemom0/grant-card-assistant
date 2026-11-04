@@ -6,6 +6,7 @@
  */
 
 import pkg from 'pg';
+import { redactBookingUrls } from '../utils/booking-urls.js';
 const { Pool } = pkg;
 
 // Create a shared database connection pool
@@ -102,9 +103,11 @@ export async function storeMemory(conversationId, key, value) {
  * Recall a specific memory from the database
  * @param {string} conversationId - UUID of the conversation
  * @param {string} key - Key to retrieve
+ * @param {Object} [opts]
+ * @param {boolean} [opts.redactBookingUrls] - Strip booking URLs from the value (lead-gen)
  * @returns {Object} Result with found status and value
  */
-export async function recallMemory(conversationId, key) {
+export async function recallMemory(conversationId, key, { redactBookingUrls: redact = false } = {}) {
   try {
     const result = await query(
       'SELECT value, created_at FROM conversation_memory WHERE conversation_id = $1 AND key = $2',
@@ -125,7 +128,7 @@ export async function recallMemory(conversationId, key) {
     return {
       found: true,
       key,
-      value: result.rows[0].value,
+      value: redact ? redactBookingUrls(result.rows[0].value) : result.rows[0].value,
       stored_at: result.rows[0].created_at
     };
   } catch (error) {
@@ -141,9 +144,11 @@ export async function recallMemory(conversationId, key) {
 /**
  * List all memories for a conversation
  * @param {string} conversationId - UUID of the conversation
+ * @param {Object} [opts]
+ * @param {boolean} [opts.redactBookingUrls] - Strip booking URLs from every value (lead-gen)
  * @returns {Object} Result with count and array of memories
  */
-export async function listMemories(conversationId) {
+export async function listMemories(conversationId, { redactBookingUrls: redact = false } = {}) {
   try {
     const result = await query(
       'SELECT key, value, created_at FROM conversation_memory WHERE conversation_id = $1 ORDER BY created_at DESC',
@@ -157,7 +162,7 @@ export async function listMemories(conversationId) {
       count: result.rows.length,
       memories: result.rows.map(row => ({
         key: row.key,
-        value: row.value,
+        value: redact ? redactBookingUrls(row.value) : row.value,
         stored_at: row.created_at
       }))
     };
@@ -176,9 +181,13 @@ export async function listMemories(conversationId) {
  * Load all memories for a conversation and format as system prompt addition
  * This is used to inject memories into the agent's context
  * @param {string} conversationId - UUID of the conversation
+ * @param {Object} [opts]
+ * @param {boolean} [opts.redactBookingUrls] - Strip booking URLs from every value.
+ *   Lead-gen passes it: the model must only ever write {{BOOKING_LINK}}, and
+ *   sessions stored before booking links left memory still hold real URLs.
  * @returns {string} Formatted memory context to append to system prompt
  */
-export async function loadConversationMemories(conversationId) {
+export async function loadConversationMemories(conversationId, { redactBookingUrls: redact = false } = {}) {
   try {
     const result = await query(
       'SELECT key, value FROM conversation_memory WHERE conversation_id = $1 ORDER BY created_at ASC',
@@ -190,7 +199,7 @@ export async function loadConversationMemories(conversationId) {
     }
 
     const memoryList = result.rows
-      .map(row => `  • ${row.key}: ${row.value}`)
+      .map(row => `  • ${row.key}: ${redact ? redactBookingUrls(row.value) : row.value}`)
       .join('\n');
 
     console.log(`✓ Loaded ${result.rows.length} memories into context for conversation ${conversationId}`);

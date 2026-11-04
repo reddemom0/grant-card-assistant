@@ -7,12 +7,12 @@
  * Routing matrix (authoritative — see CONSULTANT-ROUTING-JSON-REWRITE / Apr 2026):
  *   Granted Pro      → industry-routed via consultant-routing.json (Ruk or Steph)
  *   Waitlist         → industry-routed (same as Pro)
- *   Granted Starter  → NATALIE_INTRO_LINK
  *   Granted Pro Lite → NATALIE_INTRO_LINK
- *   Nonprofit        → NATALIE_INTRO_LINK
  *   Unknown          → NATALIE_INTRO_LINK
- *   Get Granted      → null (strip CTA from email body)
- *   Not a Fit        → null (strip CTA from email body)
+ *   Granted Starter  → null (strip CTA)
+ *   Nonprofit        → null (strip CTA)
+ *   Get Granted      → null (strip CTA)
+ *   Not a Fit        → null (strip CTA)
  *
  * Two surfaces consume this module:
  *   - getBookingLink()       — resolution only (returns {link, source, consultantName}).
@@ -23,6 +23,7 @@
  */
 
 import { assignConsultant } from '../services/grant-categorization.js';
+import { BOOKING_HOST_PATTERN, BOOKING_URL_PATTERN } from '../utils/booking-urls.js';
 
 export const NATALIE_INTRO_LINK = 'https://meetings.hubspot.com/natalie392/15min-intro-to-granted';
 
@@ -51,11 +52,9 @@ export class BookingLinkRoutingError extends Error {
 // prompt alone means a model slip is stripped rather than delivered — the
 // prompt is advisory, this is not.
 //
-// NOTE: 'Nonprofit' still falls through to the Natalie link below, even though
-// the prompt tells non-profits they get no call. That mismatch predates this
-// change and is left alone deliberately — whether Nonprofit should be call-
-// eligible is an open product question, not something to settle in passing.
-const NO_LINK_PRODUCTS = new Set(['Get Granted', 'Not a Fit', 'Granted Starter']);
+// 'Nonprofit' is here by product decision (2026-11-04): non-profits are never
+// offered a call, which is what the prompt has always told them.
+const NO_LINK_PRODUCTS = new Set(['Get Granted', 'Not a Fit', 'Granted Starter', 'Nonprofit']);
 // Note: 'Waitlist' is included for completeness. computeBestFitProduct
 // never returns it — Waitlist is set via HubSpot manual edit or workflows
 // only. This branch fires when those external sources route a lead through
@@ -92,17 +91,74 @@ export function getBookingLink({ best_fit_product, industry } = {}) {
     return { link: NATALIE_INTRO_LINK, consultantName: null, source: 'natalie-intro' };
   }
 
-  // Granted Starter, Granted Pro Lite, Nonprofit, Unknown, anything unrecognized
+  // Granted Pro Lite, Unknown, anything unrecognized
   return { link: NATALIE_INTRO_LINK, consultantName: null, source: 'natalie-intro' };
 }
 
 const SENTINEL_RE = /\{\{BOOKING_LINK\}\}/g;
-const MEETINGS_URL_RE = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
-// Email-mode strip: a single <p>…</p> that contains the sentinel or a meetings
+// Any booking URL the model wrote against instruction: HubSpot meetings plus
+// the other booking hosts in src/utils/booking-urls.js (Calendly, cal.com, …).
+const MEETINGS_URL_RE = new RegExp(BOOKING_URL_PATTERN, 'gi');
+// Email-mode strip: a single <p>…</p> that contains the sentinel or a booking
 // URL. The negative-lookahead `(?:(?!</p>)[\s\S])*?` prevents the non-greedy
 // quantifier from greedily crossing a </p> boundary when the matched paragraph
 // is preceded by an unrelated <p> block (a naive `[\s\S]*?` would gobble both).
-const CTA_PARAGRAPH_RE = /<p\b[^>]*>(?:(?!<\/p>)[\s\S])*?(?:\{\{BOOKING_LINK\}\}|meetings\.hubspot\.com)(?:(?!<\/p>)[\s\S])*?<\/p>\s*/gi;
+const CTA_PARAGRAPH_RE = new RegExp(
+  `<p\\b[^>]*>(?:(?!<\\/p>)[\\s\\S])*?(?:\\{\\{BOOKING_LINK\\}\\}|${BOOKING_HOST_PATTERN})(?:(?!<\\/p>)[\\s\\S])*?<\\/p>\\s*`,
+  'gi'
+);
+
+// Chat-mode strip for null-link tiers. A link, plus whatever wraps it: a
+// markdown link `[text](link)`, an `<a href="link">…</a>`, or `<link>`.
+const LINK_ATOM = `(?:\\{\\{BOOKING_LINK\\}\\}|${BOOKING_URL_PATTERN})`;
+const WRAPPED_LINK_RE = new RegExp(
+  `\\[[^\\]\\n]*\\]\\(\\s*${LINK_ATOM}\\s*\\)` +
+  `|<a\\b[^>]*href=["']?${LINK_ATOM}["']?[^>]*>[\\s\\S]*?<\\/a>` +
+  `|<${LINK_ATOM}>` +
+  `|${LINK_ATOM}`,
+  'gi'
+);
+const LINK_MARK = '\u0000';
+
+/**
+ * Remove each booking link from chat text together with the sentence that
+ * introduced it, so a no-call tier never shows "book a call here:" with
+ * nothing after it.
+ *
+ * - The sentence holding the link is dropped; others on the line stay.
+ *   Sentences end at `.`, `!` or `?` followed by a space.
+ * - A line left with no words (a bare bullet, an arrow) is dropped.
+ * - If the link stood alone on its line (not as a bullet), a directly
+ *   preceding line ending in `:` ("Book a call here:") is dropped too. A list
+ *   intro above a bullet that held the link is kept: the other bullets still
+ *   belong to it.
+ */
+function stripLinkSentencesForChat(text) {
+  const marked = text.replace(WRAPPED_LINK_RE, LINK_MARK);
+  if (!marked.includes(LINK_MARK)) return text;
+
+  const out = [];
+  for (const line of marked.split('\n')) {
+    if (!line.includes(LINK_MARK)) { out.push(line); continue; }
+
+    const isBullet = /^\s*(?:[-*+•]|\d+[.)])\s/.test(line);
+    const linkOnly = !/[\p{L}\p{N}]/u.test(line.split(LINK_MARK).join(''));
+    if (linkOnly && !isBullet) {
+      // Drop an intro line directly above ("…here:"), skipping blank lines.
+      let i = out.length - 1;
+      while (i >= 0 && out[i].trim() === '') i--;
+      if (i >= 0 && /:\s*$/.test(out[i])) out.splice(i);
+      continue;
+    }
+
+    const kept = line.split(/(?<=[.!?])\s+/).filter(sentence => !sentence.includes(LINK_MARK)).join(' ');
+    if (/[\p{L}\p{N}]/u.test(kept.replace(/^\s*(?:[-*+•]|\d+[.)])\s*/, ''))) {
+      out.push(kept.replace(/\s+$/, ''));
+    }
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '');
+}
 
 /**
  * Substitute the {{BOOKING_LINK}} sentinel (and defensively rewrite any
@@ -178,14 +234,8 @@ export function substituteBookingLink(text, { best_fit_product, industry } = {},
     return text.replace(CTA_PARAGRAPH_RE, '');
   }
 
-  // Chat mode: surgical inline strip — remove the sentinel and any hardcoded
-  // meetings URL, leaving surrounding prose. Chat output isn't reliably
+  // Chat mode: remove each sentinel or booking URL with the sentence that
+  // introduced it, leaving the rest of the prose. Chat output isn't reliably
   // wrapped in <p> tags, so paragraph-level stripping isn't safe here.
-  let out = text.replace(SENTINEL_RE, '');
-  if (MEETINGS_URL_RE.test(out)) {
-    MEETINGS_URL_RE.lastIndex = 0;
-    out = out.replace(MEETINGS_URL_RE, '');
-  }
-  MEETINGS_URL_RE.lastIndex = 0;
-  return out;
+  return stripLinkSentencesForChat(text);
 }

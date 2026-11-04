@@ -28,6 +28,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logAPICost } from '../utils/cost-logger.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
 import { buildProspectDataFromForm } from '../services/build-prospect-data.js';
+import { omitBookingLinks } from '../utils/booking-urls.js';
 import { computeBestFitProduct, computeGg3BestFitProduct, isTierPendingFirstEstimate } from './lead-gen-helpers.js';
 import { currentLeadGenMatcher, estimatedFundingFromGg3, fetchLeadGenEstimate } from '../services/lead-gen-gg3-estimate.js';
 
@@ -217,6 +218,8 @@ export async function runIntakeCategorization(sessionId, prospectDataFromForm) {
     // Persist categorization + merged_estimate to conversation_memory.
     // Upsert pattern matches executor.js:873-887; search-handler's later
     // write will overwrite cleanly with full search-derived data.
+    // Booking links are omitted: the model reads memory every turn and must
+    // only write {{BOOKING_LINK}}; routing calls getBookingLink instead.
     // Deliberately NOT writing `auto_matched_grants` at intake: an empty
     // array would short-circuit truthiness checks in downstream readers
     // (e.g. lead-notification.js:118) that today fall through on undefined.
@@ -225,14 +228,14 @@ export async function runIntakeCategorization(sessionId, prospectDataFromForm) {
        VALUES ($1, 'categorization', $2)
        ON CONFLICT (conversation_id, key)
        DO UPDATE SET value = $2`,
-      [sessionId, JSON.stringify(categorization)]
+      [sessionId, JSON.stringify(omitBookingLinks(categorization))]
     );
     await query(
       `INSERT INTO conversation_memory (conversation_id, key, value)
        VALUES ($1, 'merged_estimate', $2)
        ON CONFLICT (conversation_id, key)
        DO UPDATE SET value = $2`,
-      [sessionId, JSON.stringify(mergedEstimate)]
+      [sessionId, JSON.stringify(omitBookingLinks(mergedEstimate))]
     );
 
     // Format estimated_funding string ("$XK-$YK") for non-not_a_fit leads only.
@@ -360,14 +363,14 @@ async function runGg3IntakeCategorization(sessionId, prospectDataFromForm) {
          VALUES ($1, 'categorization', $2)
          ON CONFLICT (conversation_id, key)
          DO UPDATE SET value = $2`,
-        [sessionId, JSON.stringify(categorization)]
+        [sessionId, JSON.stringify(omitBookingLinks(categorization))]
       );
       await query(
         `INSERT INTO conversation_memory (conversation_id, key, value)
          VALUES ($1, 'merged_estimate', $2)
          ON CONFLICT (conversation_id, key)
          DO UPDATE SET value = $2`,
-        [sessionId, JSON.stringify(mergedEstimate)]
+        [sessionId, JSON.stringify(omitBookingLinks(mergedEstimate))]
       );
     }
 

@@ -7,6 +7,7 @@
 
 import { query } from '../database/connection.js';
 import { substituteBookingLink, BookingLinkRoutingError } from '../api/booking-link-routing.js';
+import { bookingUrlRegex } from '../utils/booking-urls.js';
 
 /**
  * Look up Pro/Pro Waitlist routing context for a lead-gen session.
@@ -44,7 +45,7 @@ async function lookupLeadGenRouting(conversationId) {
  */
 export async function applyChatBookingSubstitution(text, conversationId) {
   if (!text || typeof text !== 'string') return text;
-  if (!text.includes('{{BOOKING_LINK}}') && !/meetings\.hubspot\.com/i.test(text)) {
+  if (!text.includes('{{BOOKING_LINK}}') && !bookingUrlRegex().test(text)) {
     return text;
   }
   const routing = await lookupLeadGenRouting(conversationId);

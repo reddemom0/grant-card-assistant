@@ -12,6 +12,12 @@ Format:
 
 ---
 
+## 2026-11-04 — Lead-gen: booking links kept out of the model's context
+**What:** `categorization` / `merged_estimate` go to conversation memory without booking links (`omitBookingLinks`). Lead-gen memory reads (prompt injection, `memory_list`, `memory_recall`) strip booking URLs (`redactBookingUrls`), so stored sessions are covered too. The chat safety net also catches Calendly, cal.com and Google appointment links. On no-call tiers it now removes the sentence that introduced the link.
+**Why:** The one live path for a raw link was memory: real URLs sat in the prompt every turn (87 sessions in 60 days). Nothing reads links from memory; routing calls `getBookingLink`. Redaction is lead-gen only, because Oracle may legitimately store a meeting link.
+**Also:** Nonprofit joins `NO_LINK_PRODUCTS` (Chris's decision): non-profits are never offered a call, as the prompt always said and the smoke test already expected.
+**Impact:** `src/utils/booking-urls.js` (new), `memory.js`, `executor.js`, `lead-gen-init.js`, `client.js`, `streaming.js`, `booking-link-routing.js`, Variant A prompt, `docs/lead-gen.md`. Other routing unchanged; no backfill.
+
 ## 2026-11-04 — Lead-gen: chat no longer overwrites the widget industry
 **What:** `memory_store('industry', …)` writes `industry_stated` when `prospect_data.industry` is already set, and fills `industry` only when it is empty. The check and the write are one SQL `CASE`.
 **Why:** The chat's wording ("Healthcare/Medical Laboratory Services") had replaced the widget's pick, and match-lead rejected it. This is the `employee_count_stated` fix, except an empty value is still filled: chat-only sessions (`createLeadGenSession`) have no other industry source, and the Nonprofit rule, the Pro gate and booking routing read `industry`.

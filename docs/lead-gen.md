@@ -226,9 +226,15 @@ HubSpot manual edits or workflows), and a former sub-$2.5M cap was removed becau
 
 ## The `{{BOOKING_LINK}}` sentinel
 
-**In prompts:** only in the two variant-B skill files. Nothing in
-`.claude/agents/lead-gen.md`. ❓ If Variant A is live, the sentinel is never emitted and the
-whole path runs in legacy URL-rewrite mode.
+**In prompts:** the two variant-B skill files (live: `LEAD_GEN_VARIANT=B`), and since
+2026-11-04 the "Book a call" line of the Variant A prompt `.claude/agents/lead-gen.md`, which
+used to give Natalie's raw URL.
+
+**Out of the model's context:** booking links are not written to conversation memory.
+`categorization` and `merged_estimate` are stored through `omitBookingLinks`, and the three
+lead-gen memory reads (prompt injection, `memory_list`, `memory_recall`) pass every value
+through `redactBookingUrls` (`src/utils/booking-urls.js`), which covers sessions stored
+before. Routing never read links from memory; it calls `getBookingLink`.
 
 **Prompt rules, each encoding a past failure:** the sentinel must sit alone in its own `<p>`
 block — on no-link tiers the system removes the entire paragraph, so any sentence sharing it
@@ -241,9 +247,10 @@ called from `lead-gen-finalization.js` (`mode: 'email'`) and from `src/claude/st
 (`mode: 'chat'`, at end-turn flush).
 
 **Routing** — `getBookingLink`, keyed on `best_fit_product` alone:
-- `NO_LINK_PRODUCTS` = Get Granted, Not a Fit, Nonprofit, **Granted Starter** → `null`.
+- `NO_LINK_PRODUCTS` = Get Granted, Not a Fit, **Granted Starter**, **Nonprofit** → `null`.
   Starter's inclusion is deliberate: a Starter-shaped lead that deserves a conversation
-  isn't Starter at all, it's Pro.
+  isn't Starter at all, it's Pro. Nonprofit was added 2026-11-04: non-profits are never
+  offered a call, which is what the prompt always told them.
 - `INDUSTRY_ROUTED_PRODUCTS` = Granted Pro, Waitlist → `assignConsultant(industry)`.
 - Everything else → Natalie's intro link.
 
@@ -255,8 +262,13 @@ two. `getBookingLink` needs no other input.
 2. Sentinel present with missing industry or missing product → throws
    `BookingLinkRoutingError`. Hard-fail is intentional; in the email path this means **no
    email is sent**, logged as `[BOOKING-LINK-FAILURE]`.
-3. Sentinel absent → legacy mode: rewrite hardcoded HubSpot meeting URLs, strip CTA
-   paragraphs on null tiers.
+3. Sentinel absent → legacy mode: rewrite hardcoded booking URLs, strip CTA paragraphs on
+   null tiers. "Booking URL" means the hosts in `src/utils/booking-urls.js`: HubSpot
+   meetings, Calendly, cal.com, Google appointment links.
+
+On null tiers in chat, the link goes together with the sentence that introduced it. A line
+holding only the link also takes an "…here:" line directly above it, so nothing is left
+dangling.
 
 **Two known leaks, logged but not repaired:** a sentinel that survived substitution because
 it wasn't wrapped in its own `<p>` (`[BOOKING-LINK-LEAK]`), and model-invented bracket

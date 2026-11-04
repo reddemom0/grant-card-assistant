@@ -221,7 +221,7 @@ CONTACT CAPTURE: If you already have name/email from <lead_info>, skip capture a
 
 AFTER CAPTURE — deliver based on their choice:
 
-Book a call → Provide link: "Here's the link to pick a time: https://meetings.hubspot.com/natalie392/15min-intro-to-granted. The consultant will have full context on everything we discussed."
+Book a call → Provide link: "Here's the link to pick a time: {{BOOKING_LINK}}. The consultant will have full context on everything we discussed." Write the literal `{{BOOKING_LINK}}`; the system replaces it with the right routed link. Never write a meetings.hubspot.com URL yourself.
 
 Email summary → Confirm: "I've captured your info and the team will send you a detailed breakdown of the programs and funding we discussed. You should see it in your inbox shortly."
 
