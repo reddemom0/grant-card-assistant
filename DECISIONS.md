@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-11-04 — Lead-gen: chat no longer overwrites the widget industry
+**What:** `memory_store('industry', …)` writes `industry_stated` when `prospect_data.industry` is already set, and fills `industry` only when it is empty. The check and the write are one SQL `CASE`.
+**Why:** The chat's wording ("Healthcare/Medical Laboratory Services") had replaced the widget's pick, and match-lead rejected it. This is the `employee_count_stated` fix, except an empty value is still filled: chat-only sessions (`createLeadGenSession`) have no other industry source, and the Nonprofit rule, the Pro gate and booking routing read `industry`.
+**Impact:** `src/tools/executor.js`, `tests/unit/lead-gen-memory-store-industry.test.js`, `docs/lead-gen.md`, gg3-ai-service `ux-seam.open-questions.md` item 19. No backfill.
+
 ## 2026-11-04 — Hub industry vocabulary synced to gg3 5220e2e (17 industries)
 **What:** `src/control-centre/industry-vocabulary.js` re-copied from gg3 `vocabulary.ts` @ `5220e2e`:
 - the new `Defence & Aerospace` main;

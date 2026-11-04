@@ -292,20 +292,36 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                 ? 'employee_count_stated'
                 : input.key;
 
+              // Industry stated in conversation routes to industry_stated whenever
+              // `industry` already holds a value — in practice the widget form's
+              // pick, which the tier rule, booking routing and gg3 match-lead read.
+              // A model restatement ("Healthcare/Medical Laboratory Services") is
+              // not a value those readers recognise. Unlike headcount, an empty
+              // `industry` is filled: chat-only sessions have no other source.
+              // Decided in SQL so the check and the write are one statement.
+              const isIndustryKey = input.key === 'industry';
+              const mergeSql = isIndustryKey
+                ? `CASE WHEN COALESCE(prospect_data->>'industry', '') <> ''
+                     THEN jsonb_build_object('industry_stated', $1::jsonb)
+                     ELSE jsonb_build_object('industry', $1::jsonb) END`
+                : '$1::jsonb';
+
               // JSONB merge: preserve existing fields, add/update this field
               // gg3 matcher: the funding fields come from the stored gg3
               // estimate only, never from the model (docs/lead-gen.md).
               const isFundingKey = ['estimated_funding', 'available_now_funding', 'programs_matched_count'].includes(input.key);
               const upd = await dbQuery(
                 `UPDATE lead_gen_conversations
-                 SET prospect_data = prospect_data || $1::jsonb,
+                 SET prospect_data = prospect_data || ${mergeSql},
                      updated_at = NOW()
                  WHERE session_id = $2${isFundingKey ? `
                    AND COALESCE(prospect_data->>'lead_gen_matcher', '') <> 'gg3'` : ''}`,
-                [JSON.stringify({ [fieldName]: input.value }), conversationId]
+                [JSON.stringify(isIndustryKey ? input.value : { [fieldName]: input.value }), conversationId]
               );
 
-              if (isFundingKey && upd?.rowCount === 0) {
+              if (isIndustryKey) {
+                console.log(`✓ Prospect data updated: industry (or industry_stated if already set) = ${JSON.stringify(input.value).substring(0, 100)}`);
+              } else if (isFundingKey && upd?.rowCount === 0) {
                 console.log(`ℹ️  gg3 matcher: ignored model-written ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)} (stored gg3 estimate stands)`);
               } else {
                 console.log(`✓ Prospect data updated: ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)}`);
