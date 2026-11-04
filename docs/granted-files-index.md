@@ -107,8 +107,10 @@ above the floor returns no files rather than weak ones.
 **Filters:**
 - `area`, `year_from` and `year_to` use the chunk's tags.
 - `program` matches the program tag.
-- `client` matches the client tag **or the folder path**, because files under `Active Clients/`
-  are tagged area Other with no client.
+- `client` matches the client tag or the folder path.
+- Files under `Active Clients/{Client}/…` are tagged exactly like `Clients/`: area Clients, plus
+  client, program and year (`pathMeta`). The 1,985 rows filed there before this fix were re-tagged
+  on 4 Nov without re-embedding.
 
 **Labels:**
 - `older material (YEAR)` for Old Files.

@@ -100,8 +100,15 @@ describe('path meta', () => {
     expect(meta('Clients/2020 Logistics Inc/General')).toMatchObject({ year: null });
   });
 
+  test('Active Clients reads exactly like Clients', () => {
+    expect(meta('Active Clients/Norland/CanExport/2026/Claims')).toEqual({ area: 'Clients', client: 'Norland', program: 'CanExport', year: 2026 });
+    expect(meta('Active Clients/Norland/General/Undated')).toEqual({ area: 'Clients', client: 'Norland', program: null, year: null });
+    expect(meta('Active Clients/2020 Logistics Inc')).toEqual({ area: 'Clients', client: '2020 Logistics Inc', program: null, year: null });
+    expect(meta('active clients/Acme/ETG/2024')).toEqual(meta('Clients/Acme/ETG/2024'));
+  });
+
   test('unknown top level is Other; numbers that are not years are ignored', () => {
-    expect(meta('Active Clients/Acme')).toEqual({ area: 'Other', client: null, program: null, year: null });
+    expect(meta('Review/Acme')).toEqual({ area: 'Other', client: null, program: null, year: null });
     expect(meta('Programs/ETG/12345')).toMatchObject({ year: null });
   });
 });

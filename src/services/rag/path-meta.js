@@ -5,6 +5,7 @@
  * Old Files as historical. Paths follow the filing skill's layout
  * (Clients/{Client}/{Program}/{YYYY}/…, Programs/{Program}/…, Departments/{DEPT}/…);
  * Old Files keeps the same shape one level down (Old Files/Clients/{Client}/…).
+ * Active Clients/{Client}/… is tagged exactly like Clients/{Client}/… (area Clients).
  */
 
 import { folderKey } from '../../tools/google-drive.js';
@@ -22,6 +23,7 @@ const YEAR = /^(19[5-9]\d|20\d\d)(?!\d)/;
  */
 export function pathMeta(path = [], { programSet = programKeys() } = {}) {
   const keys = path.map(folderKey);
+  if (keys[0] === 'activeclients') keys[0] = 'clients';  // same shape as Clients/
   const area = AREAS[keys[0]] || 'Other';
 
   // Old Files/Clients/… and Old Files/Programs/… read like their live counterparts.
