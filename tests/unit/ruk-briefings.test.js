@@ -391,6 +391,8 @@ describe('Step 5: industry lookup', () => {
   test('HubSpot first; website only when HubSpot has none', async () => {
     const pages = jest.fn(async () => ['General contractor. Construction management, renovations and construction of homes. Construction since 1990.']);
     expect(await G.industryFor({ companyIndustry: 'Food Processing', pages })).toMatchObject({ source: 'hubspot', canonical: ['Manufacturing', 'Food & Beverage'] });
+    // gg3 5220e2e: a defence or aerospace company is Defence & Aerospace AND Manufacturing.
+    expect(await G.industryFor({ companyIndustry: 'Aviation & Aerospace', pages })).toMatchObject({ source: 'hubspot', canonical: ['Defence & Aerospace', 'Manufacturing'] });
     expect(pages).not.toHaveBeenCalled();
     expect(await G.industryFor({ companyIndustry: null, pages })).toMatchObject({ source: 'website', industries: ['Construction'] });
     expect(await G.industryFor({ companyIndustry: null, pages: async () => ['We build great things'] })).toMatchObject({ source: 'none', industries: [] });

@@ -376,3 +376,5 @@ Nothing in `docs/` covers lead-gen. What exists:
 - Sentinel leaks logged but unfixed — prompt-side fix outstanding
 - Stale "max 20 messages" comment against a constant of 12
 - No retention policy for finalized conversations
+- **Organization type isn't asked, so non-profit-only grants are never filtered out.** The widget and chat never capture whether a lead is a non-profit or a for-profit, so match-lead gets no `business_type`. Grants restricted to non-profits or associations (for example 1484 AgriMarketing before gg3's 2026-11-03 retag) can therefore surface for any company. Logged 2026-11-04; not fixed.
+- **An unrecognised widget industry gets no estimate under gg3.** A real lead submitted 2026-10-30 with industry "Healthcare/Medical Laboratory Services" makes match-lead return `insufficient_profile` (`dropped: not an industry the engine recognises`), so it would get no estimate at all. This blocks `LEAD_GEN_MATCHER=gg3`: before switching, check every widget industry against gg3's `normaliseLeadInput`. See gg3-ai-service `ux-seam.open-questions.md` item 19.

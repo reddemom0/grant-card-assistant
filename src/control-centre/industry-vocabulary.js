@@ -1,8 +1,8 @@
 /**
  * Control Centre — the matching engine's industry vocabulary, COPIED.
  *
- * Source: gg3-ai-service src/lib/matching/vocabulary.ts @ c3792e3 (2026-10-22):
- *   CANONICAL_INDUSTRIES          → MAIN_INDUSTRIES (the 16 main industries)
+ * Source: gg3-ai-service src/lib/matching/vocabulary.ts @ 5220e2e (2026-11-03):
+ *   CANONICAL_INDUSTRIES          → MAIN_INDUSTRIES (the 17 main industries)
  *   GRANT_INDUSTRY_TO_CANONICAL   → TOKEN_TO_MAINS (84 specific tokens → main)
  *   PROFILE_INDUSTRY_ALIASES      → PROFILE_ALIASES
  *   PROFILE_INDUSTRY_EXPANSIONS   → PROFILE_EXPANSIONS
@@ -35,7 +35,8 @@ export const MAIN_INDUSTRIES = Object.freeze([
   'Transportation & Logistics',
   'Natural Resources',
   'Hospitality & Tourism',
-  'Food & Beverage'
+  'Food & Beverage',
+  'Defence & Aerospace'
 ]);
 
 // Specific token → its main(s). [] = a business type or placeholder, not an industry.
@@ -106,14 +107,14 @@ export const TOKEN_TO_MAINS = Object.freeze({
   'Tech - Software & Web Development': ['Software'],
   'Tech - AI': ['Software'],
   'Tech - Computer Network Security': ['Software'],
+  'Tech - Technology Hardware': ['Software'],
+  'Defense': ['Defence & Aerospace'],
+  'Tech - Defense': ['Defence & Aerospace'],
+  'Aviation & Aerospace': ['Defence & Aerospace'],
   'Healthcare - Manufacturing': ['Health', 'Manufacturing'],
   'Tech - Video Game': ['Software', 'Digital Media'],
   'Tech - Biotechnology': ['Health'],
-  'Tech - Technology Hardware': ['Manufacturing'],
-  'Aviation & Aerospace': ['Manufacturing'],
   'Ship Building/Repair & Maritime Operations': ['Manufacturing'],
-  'Tech - Defense': ['Manufacturing'],
-  'Defense': ['Manufacturing'],
   'Arts & Culture': ['Digital Media'],
   'Wholesaling': ['Retail'],
   'Esthetics & Spas': ['Retail'],
@@ -131,7 +132,7 @@ export const PROFILE_ALIASES = Object.freeze({
   'software and it': 'Software',
   'healthcare': 'Health',
   'food and beverage': 'Food & Beverage',
-  'technology hardware': 'Manufacturing',
+  'technology hardware': 'Software',
   'transportation and logistics': 'Transportation & Logistics',
   'logistics': 'Transportation & Logistics',
   'hospitality and tourism': 'Hospitality & Tourism',
@@ -145,7 +146,10 @@ export const PROFILE_EXPANSIONS = Object.freeze({
   'food processing': ['Food & Beverage', 'Manufacturing'],
   'manufacturing - food & beverage': ['Food & Beverage', 'Manufacturing'],
   'forestry': ['Natural Resources', 'Agriculture'],
-  'fishery': ['Natural Resources', 'Agriculture', 'Food & Beverage']
+  'fishery': ['Natural Resources', 'Agriculture', 'Food & Beverage'],
+  'defense': ['Defence & Aerospace', 'Manufacturing'],
+  'tech - defense': ['Defence & Aerospace', 'Manufacturing'],
+  'aviation & aerospace': ['Defence & Aerospace', 'Manufacturing']
 });
 
 const TOKEN_INDEX_LC = new Map(Object.entries(TOKEN_TO_MAINS).map(([k, v]) => [k.toLowerCase(), v]));

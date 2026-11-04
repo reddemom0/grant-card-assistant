@@ -12,6 +12,16 @@ Format:
 
 ---
 
+## 2026-11-04 — Hub industry vocabulary synced to gg3 5220e2e (17 industries)
+**What:** `src/control-centre/industry-vocabulary.js` re-copied from gg3 `vocabulary.ts` @ `5220e2e`:
+- the new `Defence & Aerospace` main;
+- `Defense`, `Tech - Defense` and `Aviation & Aerospace` → Defence & Aerospace on the grant side, and Defence & Aerospace + Manufacturing on the company side (`PROFILE_EXPANSIONS`);
+- `Tech - Technology Hardware` and the alias `technology hardware` → Software.
+
+The briefing `INDUSTRY_SIGNALS` gains a Defence & Aerospace signal, and defence/aerospace words also signal Manufacturing, the same way food processing does.
+**Why:** to keep the copy equal to the engine, so the drift test is green again. The decision itself, and the industry v9/v9.1 prompt and the 70-grant retag the same day, are recorded in gg3-ai-service DECISIONS.md, 2026-11-03.
+**Impact:** Control Centre Coverage gets a 17th row, and defence/aviation grants and hardware companies move out of the Manufacturing row (display only). Steph and Ruk briefings send Defence & Aerospace + Manufacturing to match-lead for defence or aerospace companies. Lead-gen is unchanged.
+
 ## 2026-11-03 — Lead-gen forwards budgets to gg3 match-lead
 **What:** `buildMatchLeadInput` now sends `training_budget`, `expansion_budget` and `hiring_plans` as the raw widget strings (en dashes intact), or `null` when unset. Goal mapping (`mapWidgetToGoals`) is unchanged.
 **Why:** gg3 match-lead caps estimate goal totals by these budgets. gg3 owns the cap rules (see gg3-ai-service DECISIONS.md, 2026-11-03), and lead-gen only forwards the fields.

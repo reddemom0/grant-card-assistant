@@ -271,12 +271,13 @@ export function decodeCalculator(c = {}) {
 }
 
 /**
- * The engine's 16 canonical industries (gg3-ai-service vocabulary.ts) and the words that signal each.
- * Food processing and oil and gas also signal Manufacturing and Energy: the engine counts those companies as both.
+ * The engine's 17 canonical industries (gg3-ai-service vocabulary.ts) and the words that signal each.
+ * Food processing and oil and gas also signal Manufacturing and Energy, and defence and aerospace also
+ * signal Manufacturing: the engine counts those companies as both.
  */
 export const INDUSTRY_SIGNALS = {
   Construction: /construct|contractor|renovat|home ?build|civil works|roofing|framing|concrete|excavat/g,
-  Manufacturing: /manufactur|fabricat|food (processing|production)|machin(e|ing)|factory|production line|metal ?work/g,
+  Manufacturing: /manufactur|fabricat|food (processing|production)|machin(e|ing)|factory|production line|metal ?work|aerospace|aircraft|defen[cs]e/g,
   Agriculture: /agricultur|farm|crop|livestock|dairy|orchard|vineyard|greenhouse|ranch/g,
   'Clean Technology': /clean ?tech|renewable|solar|wind power|carbon capture|emissions? reduc/g,
   'Digital Media': /digital media|video game|animation|film production|interactive media|post-production/g,
@@ -290,7 +291,8 @@ export const INDUSTRY_SIGNALS = {
   'Transportation & Logistics': /logistics|trucking|freight|transport(ation)? (company|services)|courier|warehous|shipping/g,
   'Natural Resources': /mining|\bmines?\b|quarr|mineral|forestry|logging|timber|fisher(y|ies)|oil and gas/g,
   'Hospitality & Tourism': /hospitality|hotel|motel|lodg|tourism|tour operator|restaurant|\bcafe\b|catering|resort/g,
-  'Food & Beverage': /food (processing|processor|manufactur|production)|food and beverage|food & beverage|bakery|brewer|winery|distiller|seafood|meat process|beverage/g
+  'Food & Beverage': /food (processing|processor|manufactur|production)|food and beverage|food & beverage|bakery|brewer|winery|distiller|seafood|meat process|beverage/g,
+  'Defence & Aerospace': /defen[cs]e|aerospace|aviation|aircraft|military/g
 };
 
 /**

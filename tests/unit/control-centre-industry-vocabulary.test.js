@@ -1,7 +1,7 @@
 /**
  * The Hub's copy of the engine's industry vocabulary
  * (src/control-centre/industry-vocabulary.js) must equal gg3-ai-service
- * src/lib/matching/vocabulary.ts: the 16 main industries, the token → main
+ * src/lib/matching/vocabulary.ts: the 17 main industries, the token → main
  * table, the profile aliases and the profile expansions. Reads the sibling repo from disk; skipped
  * (with a message) when it isn't there, e.g. on Railway.
  *
@@ -48,8 +48,8 @@ function parse(src) {
 });
 
 describe('the copy itself', () => {
-  test('16 mains, 84 tokens, every mapped or expanded main is a main industry', () => {
-    expect(V.MAIN_INDUSTRIES).toHaveLength(16);
+  test('17 mains, 84 tokens, every mapped or expanded main is a main industry', () => {
+    expect(V.MAIN_INDUSTRIES).toHaveLength(17);
     expect(Object.keys(V.TOKEN_TO_MAINS)).toHaveLength(84);
     for (const mains of Object.values(V.TOKEN_TO_MAINS)) for (const m of mains) expect(V.MAIN_INDUSTRIES).toContain(m);
     for (const mains of Object.values(V.PROFILE_EXPANSIONS)) for (const m of mains) expect(V.MAIN_INDUSTRIES).toContain(m);

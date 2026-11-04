@@ -1143,7 +1143,7 @@ counts them by tag level only, as open to every industry.
 
 ### Industry table
 
-One row per main industry (the engine's 16), each expanding into its specific industries. A row
+One row per main industry (the engine's 17), each expanding into its specific industries. A row
 expands to list its restricted grants (restricted first, then the grants open to every industry,
 collapsed), its clients, and the grants cut for wrong industry. Every grant links to `#grants/<id>`
 and every client to `#companies/<id>`.
