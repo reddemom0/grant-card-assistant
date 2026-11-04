@@ -13,7 +13,7 @@ export * from '../../../../src/tools/executor.js?real';
 
 export const READ_TOOLS = new Set([
   'memory_recall', 'memory_list', 'load_skill',
-  'search_oracle_kb', 'get_visualping_alerts', 'check_blog_coverage', 'check_marketing_calendar',
+  'search_oracle_kb', 'search_granted_files', 'get_visualping_alerts', 'check_blog_coverage', 'check_marketing_calendar',
   'get_recent_granted_ca_post', 'search_recent_wins', 'grant_data',
   'search_federal_grants_aggregate', 'search_federal_grants_records',
   'search_google_drive', 'read_google_drive_file', 'list_files_in_folder', 'read_dropbox_file',

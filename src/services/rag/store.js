@@ -109,6 +109,63 @@ export async function status(since = null) {
   return { byStatus: byStatus.rows, chunks: chunks.rows[0], failures: failures.rows, touched: touched.rows[0] || null, nightly: runs };
 }
 
+// ---------------------------------------------------------------- search (Oracle's search_granted_files)
+
+const likeEscape = (s) => String(s).replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/** Optional filters as SQL conditions, numbered from `start`. Chunk-level area/year use the chunk columns. */
+function searchFilters({ area, client, program, yearFrom, yearTo } = {}, start, alias = 'c') {
+  const where = [];
+  const params = [];
+  const add = (sql, value) => { params.push(value); where.push(sql.replaceAll('?', `$${start + params.length - 1}`)); };
+  if (area) add(`${alias}.area = ?`, area);
+  if (yearFrom) add(`${alias}.year >= ?`, yearFrom);
+  if (yearTo) add(`${alias}.year <= ?`, yearTo);
+  // The path too: files under Active Clients/<client> carry no client tag.
+  if (client) add(`(f.client ILIKE ? OR f.path ILIKE ?)`, `%${likeEscape(client)}%`);
+  if (program) add(`f.program ILIKE ?`, `%${likeEscape(program)}%`);
+  return { where, params };
+}
+
+/**
+ * The k closest chunks by exact cosine, from indexed canonical files only (read-only).
+ * @returns {Promise<{file_id, name, path, area, client, program, year, mime, locator, text, score}[]>}
+ */
+export async function searchChunks(vector, { k = 30, ...filters } = {}) {
+  const { where, params } = searchFilters(filters, 3);
+  const { rows } = await query(
+    `SELECT c.file_id, f.name, f.path, f.area, f.client, f.program, f.year, f.mime, c.locator, c.text,
+            1 - (c.embedding <=> $1::halfvec) AS score
+     FROM drive_chunks c JOIN drive_files f ON f.file_id = c.file_id
+     WHERE c.embedding IS NOT NULL AND f.status = 'indexed' AND f.duplicate_of IS NULL
+       ${where.map(w => `AND ${w}`).join(' ')}
+     ORDER BY c.embedding <=> $1::halfvec
+     LIMIT $2`,
+    [toHalfvec(vector), k, ...params]
+  );
+  return rows.map(r => ({ ...r, score: Number(r.score) }));
+}
+
+/**
+ * Scanned (name-only) files whose name or folder shares words with the query,
+ * best full-text match first (read-only). `terms` are plain words, already cleaned.
+ */
+export async function scannedCandidates(terms, { limit = 10, ...filters } = {}) {
+  const words = terms.map(t => String(t).replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
+  if (!words.length) return [];
+  const { where, params } = searchFilters(filters, 3, 'f');
+  const { rows } = await query(
+    `SELECT f.file_id, f.name, f.path, f.area, f.client, f.program, f.year, f.mime, ts_rank(doc, q) AS rank
+     FROM drive_files f, to_tsquery('simple', $1) q, to_tsvector('simple', f.name || ' ' || replace(f.path, '/', ' ')) doc
+     WHERE f.status = 'scanned' AND f.duplicate_of IS NULL AND doc @@ q
+       ${where.map(w => `AND ${w}`).join(' ')}
+     ORDER BY rank DESC
+     LIMIT $2`,
+    [words.join(' | '), limit, ...params]
+  );
+  return rows;
+}
+
 // ---------------------------------------------------------------- nightly updater (migration 060)
 
 /** Every live row sharing these md5s, to complete dedupe groups (read-only). */

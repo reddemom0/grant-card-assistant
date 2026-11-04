@@ -12,6 +12,17 @@ Format:
 
 ---
 
+## 2026-11-04 — Oracle searches Granted Files (`search_granted_files`)
+**What:** a new Oracle-only tool runs semantic search over the Granted Files index (`src/services/rag/search.js`, `src/tools/granted-files-search.js`), always loaded rather than deferred.
+- Search: cosine top 30, reranked with Voyage `rerank-2.5-lite`, with floors (0.5 after rerank).
+- Ranking: a small recency boost and an Old Files penalty, and Old Files results are labelled "older material (YEAR)".
+- Scanned PDFs are offered by name only.
+- Results are limited to files the asker can open (a `files.get` as them; fails closed).
+- The tool never logs its input or results (`QUIET_TOOLS`).
+
+**Why:** consultants' "what have we done before" questions need Granted's own files, with links. A deferred tool is only found when the model thinks to search, and the access filter stops snippets from Limited-access folders reaching people who can't open them. On the 4 Nov eval, rerank fixed the weak trial answers ("CanExport budget" now returns budgets).
+**Impact:** `src/services/rag/{search,store,voyage}.js`, `src/tools/{granted-files-search,definitions,executor}.js`, `src/claude/client.js`, `.claude/agents/internal-oracle.md`, `scripts/rag-eval.mjs`, `tests/evals/granted-files/questions.json`. The Dropbox search (`search_oracle_kb`) stays until it is retired.
+
 ## 2026-11-04 — Lead-gen: booking links kept out of the model's context
 **What:** `categorization` / `merged_estimate` go to conversation memory without booking links (`omitBookingLinks`). Lead-gen memory reads (prompt injection, `memory_list`, `memory_recall`) strip booking URLs (`redactBookingUrls`), so stored sessions are covered too. The chat safety net also catches Calendly, cal.com and Google appointment links. On no-call tiers it now removes the sentence that introduced the link.
 **Why:** The one live path for a raw link was memory: real URLs sat in the prompt every turn (87 sessions in 60 days). Nothing reads links from memory; routing calls `getBookingLink`. Redaction is lead-gen only, because Oracle may legitimately store a meeting link.

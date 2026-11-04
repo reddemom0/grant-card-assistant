@@ -109,6 +109,9 @@ async function buildProspectDataFromSession(conversationId) {
   }
 }
 
+/** Tools whose inputs and results are never logged (user text, file snippets). */
+export const QUIET_TOOLS = new Set(['search_granted_files']);
+
 /**
  * Execute a tool call from Claude
  * @param {string} toolName - Name of the tool to execute
@@ -129,7 +132,9 @@ async function buildProspectDataFromSession(conversationId) {
 export async function executeToolCall(toolName, input, conversationId, userId = null, agentType = null, options = {}) {
   console.log(`🔧 Executing tool: ${toolName}`);
   // options.quiet (runAgent quietLogs): a run over someone's mail logs no content.
-  if (options.quiet) console.log(`   Input: (${JSON.stringify(input ?? {}).length} chars, not logged)`);
+  // QUIET_TOOLS never log content: their inputs and results are user text and file snippets.
+  const quiet = options.quiet || QUIET_TOOLS.has(toolName);
+  if (quiet) console.log(`   Input: (${JSON.stringify(input ?? {}).length} chars, not logged)`);
   else console.log(`   Input:`, JSON.stringify(input, null, 2));
 
   // Get user email for domain-wide delegation (Google Drive search AND read).
@@ -141,7 +146,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
   // list_granted_files_folders refuses outright when no email is found here:
   // it never falls back to the bare service account.
   const DELEGATED_DRIVE_TOOLS = ['search_google_drive', 'read_google_drive_file', 'list_files_in_folder', 'list_granted_files_folders',
-    'file_move_rename', 'file_move_rename_undo'];
+    'file_move_rename', 'file_move_rename_undo', 'search_granted_files'];
   let userEmail = null;
   if (userId && DELEGATED_DRIVE_TOOLS.includes(toolName)) {
     try {
@@ -882,6 +887,12 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      case 'search_granted_files': {
+        const { runGrantedFilesSearch } = await import('./granted-files-search.js');
+        result = await runGrantedFilesSearch(input, { userEmail });
+        break;
+      }
+
       case 'pulse_stats': {
         const { runPulseStats } = await import('./pulse-stats.js');
         result = await runPulseStats(input, { userId });
@@ -1354,7 +1365,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
     }
 
     console.log(`✅ Tool ${toolName} completed`);
-    if (options.quiet) console.log(`   Result: (${JSON.stringify(result ?? {}).length} chars, not logged)`);
+    if (quiet) console.log(`   Result: (${JSON.stringify(result ?? {}).length} chars, not logged)`);
     else console.log(`   Result:`, JSON.stringify(result, null, 2).substring(0, 500) + '...');
 
     if (autoApproval) await recordResult(autoApproval.id, result).catch(() => {});

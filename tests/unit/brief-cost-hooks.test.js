@@ -46,12 +46,15 @@ describe('runAgent hooks (source wiring)', () => {
   });
   test('quietLogs keeps tool inputs and results out of the runAgent and executor logs', () => {
     expect(src).toMatch(/quietLogs = false/);
-    expect(src).toMatch(/if \(quietLogs\) console\.log\(`  📥 Input: \(/);
-    expect(src).toMatch(/if \(quietLogs\) console\.log\(`  📤 Result: \(/);
+    // QUIET_TOOLS (search_granted_files) are quiet on every run.
+    expect(src).toMatch(/const quietTool = quietLogs \|\| QUIET_TOOLS\.has\(block\.name\);/);
+    expect(src).toMatch(/if \(quietTool\) console\.log\(`  📥 Input: \(/);
+    expect(src).toMatch(/if \(quietTool\) console\.log\(`  📤 Result: \(/);
     expect(src).toMatch(/\.\.\.\(quietLogs \? \{ quiet: true \} : \{\}\)/);
     const exec = readFileSync(new URL('../../src/tools/executor.js', import.meta.url), 'utf8');
-    expect(exec).toMatch(/if \(options\.quiet\) console\.log\(`   Input: \(/);
-    expect(exec).toMatch(/if \(options\.quiet\) console\.log\(`   Result: \(/);
+    expect(exec).toMatch(/const quiet = options\.quiet \|\| QUIET_TOOLS\.has\(toolName\);/);
+    expect(exec).toMatch(/if \(quiet\) console\.log\(`   Input: \(/);
+    expect(exec).toMatch(/if \(quiet\) console\.log\(`   Result: \(/);
     const web = readFileSync(new URL('../../src/api/lead-gen-init.js', import.meta.url), 'utf8');
     expect(web).toMatch(/quiet = false \} = \{\}\) \{/);
     expect(web).toMatch(/quiet \? 'a website' : websiteUrl/);

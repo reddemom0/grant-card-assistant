@@ -39,7 +39,7 @@ describe('withToolSearch on Oracle + Sonnet 5.5', () => {
     const out = oracleSonnet();
     const deferred = out.filter(t => t.defer_loading).map(t => t.name).sort();
     expect(deferred).toEqual([...ORACLE_DEFERRED_TOOLS].sort());
-    for (const name of ['load_skill', 'grant_data', 'track_review', 'read_chat_attachments']) {
+    for (const name of ['load_skill', 'grant_data', 'track_review', 'read_chat_attachments', 'search_granted_files']) {
       expect(out.find(t => t.name === name).defer_loading).toBeUndefined();
     }
   });

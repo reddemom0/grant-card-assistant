@@ -13,7 +13,7 @@ import { loadAgentPromptCached } from '../agents/load-agents.js';
 import { loadConversationMemories } from '../tools/memory.js';
 import { loadLearningMemory } from '../tools/learning-memory.js';
 import { getLeadGenFormContext } from '../utils/lead-gen-context.js';
-import { executeToolCall } from '../tools/executor.js';
+import { executeToolCall, QUIET_TOOLS } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution, hasVisibleText } from './streaming.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from './tool-output.js';
@@ -1168,7 +1168,8 @@ export async function runAgent({
         for (const block of fullResponse.content) {
           if (block.type === 'tool_use') {
             console.log(`\n  🛠️  Tool: ${block.name}`);
-            if (quietLogs) console.log(`  📥 Input: (${JSON.stringify(block.input ?? {}).length} chars, not logged)`);
+            const quietTool = quietLogs || QUIET_TOOLS.has(block.name);
+            if (quietTool) console.log(`  📥 Input: (${JSON.stringify(block.input ?? {}).length} chars, not logged)`);
             else console.log(`  📥 Input:`, JSON.stringify(block.input, null, 2));
 
             // Notify frontend of tool use
@@ -1191,7 +1192,7 @@ export async function runAgent({
               { ...(chatContext ? { chatContext } : {}), ...(quietLogs ? { quiet: true } : {}) }
             );
 
-            if (quietLogs) console.log(`  📤 Result: (${JSON.stringify(result ?? {}).length} chars, not logged)`);
+            if (quietTool) console.log(`  📤 Result: (${JSON.stringify(result ?? {}).length} chars, not logged)`);
             else console.log(`  📤 Result:`, JSON.stringify(result, null, 2).substring(0, 200) + '...');
 
             // Notify frontend of tool result

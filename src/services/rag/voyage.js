@@ -33,17 +33,12 @@ function voyage() {
 
 const statusOf = (err) => Number(err?.statusCode || err?.status || err?.response?.status) || 0;
 
-async function embed(input, inputType, { attempts = 8, wait = sleep, api = null } = {}) {
-  const call = api || ((req) => voyage().embed(req));
+// Retry on 429 / 5xx / network, back off 2 s doubling to 64 s; a 401/403 is a rejected key.
+async function withRetry(fn, { attempts = 8, wait = sleep } = {}) {
   let delay = 2000;
   for (let i = 1; ; i++) {
     try {
-      const res = await call({ input, model: MODEL, inputType, outputDimension: DIMENSIONS });
-      const vectors = (res.data || []).sort((a, b) => a.index - b.index).map(d => d.embedding);
-      if (vectors.length !== input.length || vectors.some(v => v?.length !== DIMENSIONS)) {
-        throw Object.assign(new Error('unexpected embedding shape'), { code: 'voyage_shape' });
-      }
-      return { vectors, tokens: res.usage?.totalTokens ?? 0 };
+      return await fn();
     } catch (err) {
       const status = statusOf(err);
       if (status === 401 || status === 403) throw new VoyageKeyError();
@@ -55,6 +50,18 @@ async function embed(input, inputType, { attempts = 8, wait = sleep, api = null 
   }
 }
 
+async function embed(input, inputType, { attempts = 8, wait = sleep, api = null } = {}) {
+  const call = api || ((req) => voyage().embed(req));
+  return withRetry(async () => {
+    const res = await call({ input, model: MODEL, inputType, outputDimension: DIMENSIONS });
+    const vectors = (res.data || []).sort((a, b) => a.index - b.index).map(d => d.embedding);
+    if (vectors.length !== input.length || vectors.some(v => v?.length !== DIMENSIONS)) {
+      throw Object.assign(new Error('unexpected embedding shape'), { code: 'voyage_shape' });
+    }
+    return { vectors, tokens: res.usage?.totalTokens ?? 0 };
+  }, { attempts, wait });
+}
+
 /** @param {string[]} texts @returns {Promise<{vectors: number[][], tokens: number}>} */
 export const embedDocuments = (texts, opts) => embed(texts, 'document', opts);
 
@@ -62,6 +69,24 @@ export const embedDocuments = (texts, opts) => embed(texts, 'document', opts);
 export async function embedQuery(text, opts) {
   const { vectors, tokens } = await embed([text], 'query', opts);
   return { vector: vectors[0], tokens };
+}
+
+export const RERANK_MODEL = 'rerank-2.5-lite';
+export const RERANK_USD_PER_MILLION = 0.02;
+
+/**
+ * Relevance of each document to the query (Voyage rerank), best first.
+ * @returns {Promise<{ranked: {index: number, score: number}[], tokens: number}>}
+ */
+export async function rerank(query, documents, { topK = documents.length, model = RERANK_MODEL, attempts = 3, wait = sleep, api = null } = {}) {
+  if (!documents.length) return { ranked: [], tokens: 0 };
+  const call = api || ((req) => voyage().rerank(req));
+  return withRetry(async () => {
+    const res = await call({ query, documents, model, topK, truncation: true });
+    const ranked = (res.data || []).map(d => ({ index: d.index, score: d.relevanceScore ?? d.relevance_score ?? 0 }))
+      .sort((a, b) => b.score - a.score);
+    return { ranked, tokens: res.usage?.totalTokens ?? 0 };
+  }, { attempts, wait });
 }
 
 /** Postgres halfvec literal. */

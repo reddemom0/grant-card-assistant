@@ -2558,6 +2558,35 @@ Modes:
 };
 
 /**
+ * Semantic search over the Granted Files index (src/tools/granted-files-search.js,
+ * src/services/rag/search.js). Oracle-only — referenced in the internal-oracle
+ * case, not ORACLE_TOOLS, so the orchestrator never gets it. Always loaded (not in
+ * ORACLE_DEFERRED_TOOLS): it is Oracle's main route to Granted's own past work.
+ * Read-only; results limited to files the asker can open.
+ */
+export const SEARCH_GRANTED_FILES_TOOL = {
+  name: 'search_granted_files',
+  description: `Search Granted Files (the shared drive) for Granted's own work: past applications and business cases, a client's history with us, examples to reuse, budgets, claims and internal process documents. Semantic search over the text of indexed files; returns the best-matching files with a Drive link, path, page or tab locators and short snippets. Only files the asker can open are returned.
+
+Not for grant facts — eligibility, deadlines, amounts or whether a program is open come from grant_data and official program pages.
+
+Results labelled "older material (YEAR)" come from Old Files; "scanned file — name only" means only the file name and folder matched. An empty result means nothing relevant was found.`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'What to look for, in plain words, e.g. "ETG business case for a trades company".' },
+      area: { type: 'string', enum: ['Clients', 'Programs', 'Departments', 'Old Files', 'Other'], description: 'Optional: only this top-level area.' },
+      client: { type: 'string', description: 'Optional: only files for this client (part of the client folder name).' },
+      program: { type: 'string', description: 'Optional: only files filed under this program (e.g. CanExport, ETG).' },
+      year_from: { type: 'integer', description: 'Optional: earliest year (from the folder year).' },
+      year_to: { type: 'integer', description: 'Optional: latest year.' },
+      limit: { type: 'integer', minimum: 1, maximum: 8, description: 'Most snippets to return across files, 1–8. Default 8.' }
+    },
+    required: ['query']
+  }
+};
+
+/**
  * Live folder lookup in the Granted Files shared drive for the filing skill
  * (listGrantedFilesFolders in src/tools/google-drive.js). Oracle-only —
  * referenced in the internal-oracle case and nowhere else. Read-only, folders
@@ -3219,7 +3248,7 @@ export function getToolsForAgent(agentType) {
       // GG3_CONVERSATIONS_TOOL and PULSE_STATS_TOOL likewise: client conversations and usage stats are for the team
       // through Oracle only, not for the orchestrator. GRANTED_FILES_FOLDERS_TOOL and FILE_MOVE_RENAME_TOOLS (filing skill) likewise.
       // CONTROL_CENTRE_TOOL likewise: the review queue and Overview, read-only, for the team through Oracle.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL, CONTROL_CENTRE_TOOL, GRANTED_FILES_FOLDERS_TOOL, ...FILE_MOVE_RENAME_TOOLS];
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL, CONTROL_CENTRE_TOOL, GRANTED_FILES_FOLDERS_TOOL, SEARCH_GRANTED_FILES_TOOL, ...FILE_MOVE_RENAME_TOOLS];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

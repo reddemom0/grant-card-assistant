@@ -1,0 +1,25 @@
+{
+  "about": "Granted Files search eval (scripts/rag-eval.mjs). Questions about Granted's own work, as consultants ask them. expect: \"found\" (something useful should come back) or \"nothing\" (the right answer is that nothing relevant exists). filters use the tool's names: area, client, program, yearFrom, yearTo. Entries whose question is \"TODO\" are skipped until someone writes them.",
+  "questions": [
+    { "id": 1, "question": "CanExport budget", "expect": "found", "notes": "Weak in the Phase 2 trial: training notes and an untitled PDF, no actual budget." },
+    { "id": 2, "question": "Workplace Accessibility Grant application", "expect": "found", "notes": "Trial returned EAF templates; check they are the right program." },
+    { "id": 3, "question": "ETG training plan for a trades company", "expect": "found", "notes": "A real ETG business case for a trades employer should lead." },
+    { "id": 4, "question": "What work have we done for Norland?", "filters": { "client": "Norland" }, "expect": "found", "notes": "Client history; files now live under Active Clients/Norland." },
+    { "id": 5, "question": "Show me a strong example of a CanExport application for a food exporter", "expect": "found", "notes": "A 'strong example of X' ask." },
+    { "id": 6, "question": "BCAFE marketing plan budget breakdown", "expect": "found" },
+    { "id": 7, "question": "How do we submit a WorkBC wage subsidy claim?", "expect": "found", "notes": "Internal process; trial returned client claim forms." },
+    { "id": 8, "question": "Reasons a CanExport claim expense was rejected", "expect": "found" },
+    { "id": 9, "question": "Magnet SWPP eligibility checklist we use", "expect": "found" },
+    { "id": 10, "question": "Our process for quantum computing satellite grants in Antarctica", "expect": "nothing", "notes": "Should come back empty or clearly irrelevant." },
+    { "id": 11, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 12, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 13, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 14, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 15, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 16, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 17, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 18, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 19, "question": "TODO", "expect": "found", "notes": "For Nat or a consultant to write." },
+    { "id": 20, "question": "TODO", "expect": "nothing", "notes": "For Nat or a consultant: another question whose right answer is 'nothing found'." }
+  ]
+}

@@ -1,8 +1,8 @@
 # Granted Files index — current state
 
-A semantic index of Granted Files (the shared drive), for Oracle to search in Phase 4. It
-holds text chunks with voyage-3.5 embeddings (512 dims, `halfvec`) in Postgres. Oracle doesn't
-use it yet.
+A semantic index of Granted Files (the shared drive), searched by Oracle's
+`search_granted_files` tool. It holds text chunks with voyage-3.5 embeddings (512 dims, `halfvec`)
+in Postgres.
 
 ## Tables
 | Table | Migration | Holds |
@@ -81,6 +81,66 @@ separate. Unlike the sweep, the index includes Old Files, Active Clients and Rev
     only. Rows still carrying the old path stay until those files change.
   - A folder moved next to an existing folder with the same name and path is skipped as
     unchanged, so its files keep their old paths until they change.
+
+## Search tool (`search_granted_files`)
+Oracle-only, and always loaded (not deferred): it is Oracle's route to Granted's own past work.
+Prompt rules are under "Granted Files (past work)" in `.claude/agents/internal-oracle.md`.
+
+**When Oracle uses it:** Granted's own work, such as past applications, a client's history, examples
+to reuse, budgets and internal process docs. Not for grant facts (eligibility, deadlines, amounts,
+status), which still come from `grant_data` and official program pages.
+
+**How a search runs** (`searchGrantedFiles` in `src/services/rag/search.js`):
+1. The query is embedded with voyage-3.5 (`input_type: query`).
+2. The 30 closest chunks are taken by exact cosine, from `indexed` canonical files only.
+3. Up to 10 scanned (name-only) files whose name or folder shares words with the query are added.
+4. Everything is reranked with `rerank-2.5-lite`.
+5. A small boost applies: up to +0.02 for recent years, and −0.03 for Old Files.
+6. Chunks are grouped by file. At most 6 files and 8 snippets are returned (300 characters each,
+   already redacted).
+
+**Floors:** a reranked chunk below 0.5 is dropped, and a scanned file needs 0.5 on its name and
+folder. Without rerank, the cosine floor is 0.55. The floors were set from the eval: irrelevant
+results scored at most 0.44 after rerank, relevant ones 0.67 or more. An answer with nothing
+above the floor returns no files rather than weak ones.
+
+**Filters:**
+- `area`, `year_from` and `year_to` use the chunk's tags.
+- `program` matches the program tag.
+- `client` matches the client tag **or the folder path**, because files under `Active Clients/`
+  are tagged area Other with no client.
+
+**Labels:**
+- `older material (YEAR)` for Old Files.
+- `scanned file — name only` for scanned PDFs. Oracle mentions these only as "there's a scanned
+  file that may help".
+
+**Access:** each result file gets a read-only `files.get` as the asker. Files they can't open are
+dropped and only counted (`hidden_no_access`). If Drive can't be reached as the asker, the search
+fails closed with "Drive access unavailable".
+
+**Logging:** the tool is in `QUIET_TOOLS` (`src/tools/executor.js`), so the executor and
+`runAgent` log only input and result sizes. Each call logs one line with the query length, filter
+names, counts, timings and tokens. Oracle's own per-message log line still prints the user's
+message, as it does for every turn.
+
+**Cost:** about 10k Voyage tokens per search (query plus rerank), roughly $0.0002.
+
+**Latency** (eval of 4 Nov, 245k chunks, Postgres capped at 1 GB):
+
+| | p50 | p95 |
+|---|---|---|
+| Whole search | 0.9 s | 1.3 s |
+| SQL | 0.26 s | 0.30 s |
+
+The first query on a cold cache takes about 4–5 s.
+
+**Eval:**
+- Questions are in `tests/evals/granted-files/questions.json`: 10 written, 10 TODO for consultants.
+- Run it in the container with
+  `PGOPTIONS='-c default_transaction_read_only=on' node scripts/rag-eval.mjs [--mode rerank|cosine|both]`.
+- It writes a markdown table with a blank Pass/Fail column. Reports name client files, so keep
+  them out of git.
 
 ## Commands
 Run these in the container (`railway ssh --service grant-card-assistant -- "cd /app && …"`),
