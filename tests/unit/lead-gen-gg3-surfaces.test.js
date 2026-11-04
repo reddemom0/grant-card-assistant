@@ -25,11 +25,11 @@ jest.unstable_mockModule('../../src/services/match-lead-client.js', () => ({
 }));
 
 const { query } = await import('../../src/database/connection.js');
-const { categorizeProspect } = await import('../../src/services/grant-categorization.js');
+const { categorizeProspect, assignConsultant } = await import('../../src/services/grant-categorization.js');
 const { matchLead } = await import('../../src/services/match-lead-client.js');
 const { runIntakeCategorization } = await import('../../src/api/lead-gen-init.js');
 const { getLeadGenFormContext } = await import('../../src/utils/lead-gen-context.js');
-const { composeLeadGenEmailBody } = await import('../../src/api/lead-gen-finalization.js');
+const { composeLeadGenEmailBody, buildNoteBodyComprehensive } = await import('../../src/api/lead-gen-finalization.js');
 const { getToolsForAgent } = await import('../../src/tools/definitions.js');
 
 const OK_EST = {
@@ -95,6 +95,33 @@ describe('intake', () => {
     expect(intakePatch()).toMatchObject({ best_fit_product: 'Granted Starter', estimated_funding: '$50,000–$150,000' });
   });
 
+  describe('gg3: no_matches', () => {
+    const NO_MATCHES = { status: 'no_matches', low: null, high: null, per_goal: [], matches_used: 0, notes: ['no high or medium match with region tags; nothing to estimate from'] };
+    const run = async (id, form) => {
+      categorizeProspect.mockResolvedValue(CATEGORIZATION);
+      matchLead.mockResolvedValue({ ok: true, status: 'ok', estimate: NO_MATCHES, grants: [], inputs_used: {}, dropped: [] });
+      await runIntakeCategorization(id, { ...FORM, lead_gen_matcher: 'gg3', ...form });
+      return intakePatch();
+    };
+
+    test('stored as no_matches with no figure, size rule → Get Granted, no FAIL log', async () => {
+      const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const patch = await run('s6', {});
+      const failLogged = err.mock.calls.some((c) => String(c[0]).includes('[LEAD-GEN-GG3-ESTIMATE-FAIL]'));
+      err.mockRestore();
+      expect(patch.gg3_estimate).toMatchObject({ status: 'no_matches', low: null, high: null, matches_used: 0 });
+      expect(patch.estimated_funding).toBeUndefined();
+      expect(patch.best_fit_product).toBe('Get Granted');
+      expect(failLogged).toBe(false);
+    });
+    test('a Pro-shaped lead → Granted Pro by size', async () => {
+      expect((await run('s7', { revenue_range: '$2.5M – $5M', employee_count: '20 – 49' })).best_fit_product).toBe('Granted Pro');
+    });
+    test('a non-profit stays Nonprofit', async () => {
+      expect((await run('s8', { industry: 'Charity/Non-Profit' })).best_fit_product).toBe('Nonprofit');
+    });
+  });
+
   test('legacy: no match-lead call, the rate-table estimate as before', async () => {
     categorizeProspect.mockResolvedValue(CATEGORIZATION);
     await runIntakeCategorization('s5', { ...FORM });
@@ -111,7 +138,28 @@ describe('<lead_info>', () => {
     const ctx = await getLeadGenFormContext('s1');
     expect(ctx).toContain('Total, next 12 months: $50,000–$150,000');
     expect(ctx).toContain('- Hire or Train People: $50,000–$150,000');
-    expect(ctx).toContain('search_getgranted is not available');
+    expect(ctx).toContain('there is no program search to run');
+    expect(ctx).not.toContain('search_getgranted');
+  });
+
+  test.each([
+    ['Granted Pro', true],
+    ['Get Granted', false],
+    ['Granted Starter', false],
+    ['Nonprofit', false],
+    ['Not a Fit', false]
+  ])('gg3 no_matches, %s: honest wording, review promised only to Pro', async (tier, promised) => {
+    query.mockResolvedValueOnce(row({ ...FORM, lead_gen_matcher: 'gg3', best_fit_product: tier,
+      gg3_estimate: { status: 'no_matches', low: null, high: null, per_goal: [], matches_used: 0 } }));
+    const ctx = await getLeadGenFormContext('s1');
+    expect(ctx).toContain("We couldn't find a strong fit from what they've shared");
+    if (promised) expect(ctx).toContain('say a consultant will review their profile');
+    else {
+      expect(ctx).not.toContain('say a consultant will review');
+      expect(ctx).toContain('Do not promise that anyone will review their profile');
+    }
+    expect(ctx).not.toContain('There are programs that match');
+    expect(ctx).not.toMatch(/Total, next 12 months/);
   });
 
   test('legacy: no estimate block', async () => {
@@ -125,6 +173,13 @@ describe('<lead_info>', () => {
 describe('tool loadout', () => {
   const names = () => getToolsForAgent('lead-gen').map((t) => t.name);
   afterEach(() => { delete process.env.LEAD_GEN_MATCHER; });
+
+  test('the session matcher, when given, decides over the env', () => {
+    process.env.LEAD_GEN_MATCHER = 'gg3';
+    expect(getToolsForAgent('lead-gen', { leadGenMatcher: 'legacy' }).map((t) => t.name)).toContain('search_getgranted');
+    delete process.env.LEAD_GEN_MATCHER;
+    expect(getToolsForAgent('lead-gen', { leadGenMatcher: 'gg3' }).map((t) => t.name)).not.toContain('search_getgranted');
+  });
 
   test('gg3 drops search_getgranted and nothing else', () => {
     const legacy = names();
@@ -165,9 +220,48 @@ describe('summary email body', () => {
     expect(r.html).not.toMatch(/\$\d/);
   });
 
+  test.each([
+    ['Granted Pro', "Based on what you've shared, we couldn't find a strong fit yet. A consultant will review your profile."],
+    ['Get Granted', "We couldn't find a strong fit from what you've shared yet."],
+    ['Granted Starter', "We couldn't find a strong fit from what you've shared yet."],
+    // Nonprofit and Not a Fit get the not-yet-ready email, which never has an
+    // estimate paragraph: no sentence, and no review promise either.
+    ['Nonprofit', null],
+    ['Not a Fit', null]
+  ])('gg3: no body and no_matches, %s → template, no figure, review promised only to Pro', async (tier, sentence) => {
+    query.mockResolvedValue({ rows: [{ session_id: 's1', prospect_data: {} }] });
+    // Pro routes a consultant link; the module mock returns none by default.
+    if (tier === 'Granted Pro') assignConsultant.mockReturnValueOnce({ name: 'A Consultant', booking_link: 'https://meetings.hubspot.com/test-consultant' });
+    const pd = { ...base, best_fit_product: tier, lead_gen_matcher: 'gg3', gg3_estimate: { status: 'no_matches', low: null, high: null, per_goal: [] } };
+    const r = await composeLeadGenEmailBody('s1', session, pd, 'Pat');
+    expect(r.kind).toBe('fallback');
+    if (sentence) expect(r.html).toContain(sentence);
+    else expect(r.html).not.toMatch(/strong fit/);
+    if (tier !== 'Granted Pro') expect(r.html).not.toMatch(/consultant will review/);
+    expect(r.html).not.toMatch(/programs that match your profile/);
+    expect(r.html).not.toMatch(/\$\d/);
+  });
+
   test('legacy: the agent body is kept whatever its figures', async () => {
     const pd = { ...base, email_summary_body: '<p>About $60K–$150K.</p>' };
     const r = await composeLeadGenEmailBody('s1', session, pd, 'Pat');
     expect(r).toEqual({ html: '<p>About $60K–$150K.</p>', kind: 'agent' });
+  });
+});
+
+describe('HubSpot note', () => {
+  const note = (gg3_estimate) => buildNoteBodyComprehensive({
+    prospect_data: { ...FORM, lead_gen_matcher: 'gg3', best_fit_product: 'Get Granted', gg3_estimate },
+    message_count: 4
+  }, 'contact_captured');
+
+  test('no_matches: says gg3 found nothing to estimate from, not "no estimate block"', () => {
+    const body = note({ status: 'no_matches', low: null, high: null, per_goal: [], matches_used: 0, notes: [] });
+    expect(body).toContain('No figure given — gg3 found nothing to estimate from (no_matches).');
+    expect(body).not.toContain('no estimate block');
+  });
+  test('confirm_needed and unavailable lines unchanged', () => {
+    expect(note({ status: 'confirm_needed', low: null, high: null, per_goal: [] })).toContain('No figure given — matching programs exist, amounts to be confirmed.');
+    expect(note({ status: 'unavailable', reason: 'the matching service did not answer' })).toContain('No figure given — estimate unavailable (the matching service did not answer).');
   });
 });

@@ -3167,9 +3167,12 @@ export const ALL_TOOLS = [
  * Get tools for a specific agent type
  * @param {string} agentType - The type of agent
  * @param {boolean} useToolSearch - If true, use tool search pattern (default: true)
+ * @param {Object} [opts]
+ * @param {'legacy'|'gg3'} [opts.leadGenMatcher] - lead-gen: the session's matcher
+ *   stamp. Omitted → LEAD_GEN_MATCHER decides, as before.
  * @returns {Array} Array of tool definitions for this agent
  */
-export function getToolsForAgent(agentType) {
+export function getToolsForAgent(agentType, { leadGenMatcher } = {}) {
   // All agents get server tools and memory (file-based + database)
   const baseTools = [...SERVER_TOOLS, ANTHROPIC_MEMORY_TOOL, ...MEMORY_TOOLS];
 
@@ -3278,7 +3281,10 @@ export function getToolsForAgent(agentType) {
       // gg3 matcher: the estimate is precomputed at intake and the agent never
       // names programs, so the search is dropped (its handler would also
       // overwrite the session's estimate memory). docs/lead-gen.md.
-      const gg3Matcher = String(process.env.LEAD_GEN_MATCHER || '').trim().toLowerCase() === 'gg3';
+      // The session's stamp when runAgent passes it; the env otherwise.
+      const gg3Matcher = leadGenMatcher
+        ? leadGenMatcher === 'gg3'
+        : String(process.env.LEAD_GEN_MATCHER || '').trim().toLowerCase() === 'gg3';
       const searchGrantedTool = gg3Matcher ? null : SEARCH_GETGRANTED_TOOL;
       const leadGenTools = [
         ...(webSearchTool ? [webSearchTool] : []),   // Anthropic-controlled, safe

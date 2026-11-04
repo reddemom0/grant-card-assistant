@@ -47,6 +47,16 @@ and branches on `'B'`.
 - **Anything else** — loads `.claude/agents/lead-gen.md`. Unset, invalid, and `A` all land
   here. There is no validation; `LEAD_GEN_VARIANT=Z` silently runs A while logging "VARIANT Z".
 
+**Per matcher (since 2026-11-04).** Variant B marks the `search_getgranted` text with
+whole-line comments: `<!-- legacy-matcher -->` … `<!-- /legacy-matcher -->`, and gg3-only
+replacements with `<!-- gg3-matcher -->` … `<!-- /gg3-matcher -->`. The legacy-only text is
+the tool entry, `<search_strategy>`, `<accuracy>` and the "Flow:" line.
+`selectMatcherBlocks` keeps one matcher's blocks and drops the other's. A legacy session's
+prompt is the files exactly as before, with only the marker lines removed. A gg3 session's
+prompt never mentions `search_getgranted`. `runAgent` reads the session's stamp
+(`getLeadGenMatcher`), and production caches `lead-gen:legacy` and `lead-gen:gg3` separately.
+Variant A has no markers.
+
 **`lead-gen-variant-a.md` is dead.** It exists on disk and is referenced by no JavaScript
 anywhere. Root CLAUDE.md claims it loads; it does not.
 
@@ -56,8 +66,9 @@ request, so it is observable at runtime.
 
 ## Tool loadout
 
-Seven tools in legacy mode, six with `LEAD_GEN_MATCHER=gg3` (no `search_getgranted`; see
-"Matcher switch"), assembled by name rather than by spreading groups. The case opens with a
+Seven tools in legacy mode, six in gg3 mode (no `search_getgranted`; see "Matcher
+switch"). The mode is the session's stamp, which `runAgent` passes as `leadGenMatcher`;
+without it, `LEAD_GEN_MATCHER` decides. The tools are assembled by name rather than by spreading groups. The case opens with a
 comment headed "Public chatbot — deliberately restricted tool set for security."
 
 Included: `web_search`; `memory_store` / `memory_recall` / `memory_list`;
@@ -115,9 +126,10 @@ is everything else on this page: the rate-table baseline, then the model's own e
 
 **Sticky per session.** `/init` reads the env once and writes `prospect_data.lead_gen_matcher:
 'gg3'`. Legacy sessions don't have the key. Everything after reads the session's value
-(`isGg3Session`), so flipping the env mid-session can't mix the two. The one exception is
-the tool loadout, which `getToolsForAgent` builds from the env per request; a gg3 session
-that is offered `search_getgranted` anyway gets a refusal from the executor.
+(`isGg3Session`), so flipping the env mid-session can't mix the two. Since 2026-11-04 that
+includes the prompt and the tool loadout, so a session's instructions and tools always
+agree. Sessions open at the moment of a flip keep their mode. The executor still refuses
+`search_getgranted` for a gg3 session, as a backstop.
 
 **Intake** (`runGg3IntakeCategorization` in `src/api/lead-gen-init.js`):
 - **Concurrent:** `categorizeProspect(skipHaiku)` runs for `service_tier` (the not_a_fit rules) and the consultant. `fetchLeadGenEstimate` (`src/services/lead-gen-gg3-estimate.js`) calls gg3 match-lead with an 8 s timeout.
@@ -128,7 +140,7 @@ that is offered `search_getgranted` anyway gets a refusal from the executor.
   - **Hiring Plans is never a goal source.**
 - **Budgets** (since 2026-11-03): `training_budget`, `expansion_budget` and `hiring_plans` are also sent as the raw widget strings, en dashes intact, or `null` when unset. gg3 uses them to cap goal totals and owns the cap rules (gg3-ai-service DECISIONS.md, 2026-11-03). Lead-gen does no capping of its own.
 - **Province:** the widget's comma-joined list is split. "Just me" → 1.
-- **Stored on `prospect_data.gg3_estimate`:** `{ status, low, high, per_goal, matches_used, revenue_band_used, notes, inputs_used, dropped, cards }`, where status is `ok | confirm_needed | insufficient_profile | unavailable`. `cards` holds gg3's top-5 names and providers, for the internal Note only. Failure or timeout → `unavailable`, logged `[LEAD-GEN-GG3-ESTIMATE-FAIL]`.
+- **Stored on `prospect_data.gg3_estimate`:** `{ status, low, high, per_goal, matches_used, revenue_band_used, notes, inputs_used, dropped, cards }`, where status is `ok | confirm_needed | no_matches | insufficient_profile | unavailable`. `no_matches` is gg3's "nothing to estimate from" (gg3 DECISIONS.md 2026-11-04). Any other estimate status still reads as `unavailable`. `cards` holds gg3's top-5 names and providers, for the internal Note only. Failure or timeout → `unavailable`, logged `[LEAD-GEN-GG3-ESTIMATE-FAIL]`. Every other status, `no_matches` included, gets the info line `gg3 estimate: status=…`.
 - **Tier — always locked here, never pending** (`computeGg3BestFitProduct`):
   - status `ok` → `computeBestFitProduct` on the estimate formatted low-first, so the $15,000 Starter threshold reads `estimate.low`;
   - anything else → the size rule alone: Pro gate → Granted Pro, else Get Granted.
@@ -139,6 +151,7 @@ that is offered `search_getgranted` anyway gets a refusal from the executor.
 **Chat.** `getLeadGenFormContext` adds a "Funding estimate" block to `<lead_info>`:
 - **`ok`:** the exact total and per-goal ranges, marked as overriding any estimation method in the prompt.
 - **`confirm_needed`:** "matching programs exist; amounts confirmed on review", no figure.
+- **`no_matches`:** "we couldn't find a strong fit from what they've shared yet". Only Granted Pro leads are also told "a consultant will review their profile"; nobody reviews the other tiers, so they get no review promise. No figure and no claim of matches. The wording covers both zero matches and a thin profile, which gg3 can't tell apart.
 - **Otherwise:** no figure and no claim of matches.
 
 Both prompts (`.claude/agents/lead-gen.md`, Variant B `system-operations.md`) carry one `<precomputed_estimate>` rule that defers to the block. `getStrategicContext` returns null for gg3 sessions.
@@ -154,7 +167,8 @@ Both prompts (`.claude/agents/lead-gen.md`, Variant B `system-operations.md`) ca
 - That send has kind `gg3_template`, which is not upgrade-eligible, and an upgrade send whose body was refused is skipped.
 
 **HubSpot.**
-- **Note:** a "Funding Estimate (gg3 match-lead)" section (total, per goal, matches, band, goals, notes). It replaces the rate-table baseline line.
+- **Note:** a "Funding Estimate (gg3 match-lead)" section (total, per goal, matches, band, goals, notes). It replaces the rate-table baseline line. `no_matches` reads "No figure given — gg3 found nothing to estimate from (no_matches)."
+- **Template email:** for `no_matches`, Get Granted and Starter get "We couldn't find a strong fit from what you've shared yet.", with no figure. Granted Pro instead gets "…we couldn't find a strong fit yet. A consultant will review your profile." Nonprofit and Not a Fit get the not-yet-ready email, which never has an estimate paragraph, so there's no sentence and no review promise.
 - **AI-property PATCH:** adds `grant_calc_min` / `grant_calc_max` (number properties) when status is `ok`.
 - **`email_summary_body`:** the composed (validated or template) body.
 

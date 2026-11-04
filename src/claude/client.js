@@ -12,7 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { loadAgentPromptCached } from '../agents/load-agents.js';
 import { loadConversationMemories } from '../tools/memory.js';
 import { loadLearningMemory } from '../tools/learning-memory.js';
-import { getLeadGenFormContext } from '../utils/lead-gen-context.js';
+import { getLeadGenFormContext, getLeadGenMatcher } from '../utils/lead-gen-context.js';
 import { executeToolCall, QUIET_TOOLS } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution, hasVisibleText } from './streaming.js';
@@ -177,10 +177,12 @@ const RUN_ONLY_TOOLS = ['save_team_lesson'];
  * Run-only tools (save_team_lesson) are left out unless allowedTools names them.
  * @param {string} agentType
  * @param {string[]|null} allowedTools
+ * @param {Object} [opts]
+ * @param {'legacy'|'gg3'} [opts.leadGenMatcher] - lead-gen: the session's matcher
  * @returns {Array}
  */
-export function toolsForRun(agentType, allowedTools = null) {
-  const tools = getToolsForAgent(agentType);
+export function toolsForRun(agentType, allowedTools = null, { leadGenMatcher } = {}) {
+  const tools = getToolsForAgent(agentType, { leadGenMatcher });
   return allowedTools
     ? tools.filter(t => allowedTools.includes(t.name))
     : tools.filter(t => !RUN_ONLY_TOOLS.includes(t.name));
@@ -380,7 +382,10 @@ export async function runAgent({
     // ============================================================================
 
     console.log(`📋 Loading agent prompt for: ${agentType}`);
-    const baseAgentPrompt = loadAgentPromptCached(agentType);
+    // Lead-gen: the session's matcher stamp picks the prompt and the tools, so
+    // a session never sees search_getgranted instructions without the tool.
+    const leadGenMatcher = agentType === 'lead-gen' ? await getLeadGenMatcher(conversationId) : undefined;
+    const baseAgentPrompt = loadAgentPromptCached(agentType, { matcher: leadGenMatcher });
     console.log(`✓ Agent prompt loaded (${baseAgentPrompt.length} characters)`);
 
     // ============================================================================
@@ -711,7 +716,7 @@ export async function runAgent({
     // 5. Get tools for this agent
     // ============================================================================
 
-    const tools = withToolSearch(toolsForRun(agentType, allowedTools), { agentType, model: MODEL, allowedTools });
+    const tools = withToolSearch(toolsForRun(agentType, allowedTools, { leadGenMatcher }), { agentType, model: MODEL, allowedTools });
     const deferredCount = tools.filter(t => t.defer_loading).length;
     console.log(`🔧 Loaded ${tools.length} tools for agent${allowedTools ? ' (restricted for this run)' : ''}${deferredCount ? ` (${deferredCount} on demand via tool search)` : ''}`)
 

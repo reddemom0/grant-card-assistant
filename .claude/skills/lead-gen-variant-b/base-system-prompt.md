@@ -49,8 +49,10 @@ Province and Industry may appear in either <lead_info> (form-provided) or <compa
 </form_data>
 
 <tools>
+<!-- legacy-matcher -->
 search_getgranted — Query the grant database. Returns programs ranked by smart tag scoring (intent match, genre match, funding amount, activity relevance, eligibility fit). The infrastructure pre-filters by province, categorizes the prospect by industry group, and provides a baseline estimate from rate tables. Your search results are already scored and diversified — use them as your foundation, don't re-rank or second-guess the ordering.
 
+<!-- /legacy-matcher -->
 search_lead_gen_knowledge — Answer common prospect questions: how grants work, timing, pricing, DIY vs consultant, eligibility, stacking.
 
 search_lead_gen_strategy — Strategic consulting knowledge. Use to evaluate prospects, reframe activities into fundable categories, prioritize programs.

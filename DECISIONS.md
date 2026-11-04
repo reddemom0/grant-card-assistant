@@ -12,6 +12,14 @@ Format:
 
 ---
 
+## 2026-11-04 — Lead-gen: prompt and tools follow the session's matcher; gg3 `no_matches` handled
+**What:**
+- **Prompt:** Variant B marks the `search_getgranted` text `<!-- legacy-matcher -->`, and `selectMatcherBlocks` keeps one matcher's text. Legacy sessions get today's prompt byte for byte, and gg3 sessions never see the tool. Prompts are cached per matcher.
+- **Tools:** `getToolsForAgent` takes the session's stamp too.
+- **`no_matches`:** gg3's new status is kept as its own. It gets honest wording ("couldn't find a strong fit"), the size-based tier, its own Note line, and an info log rather than `[LEAD-GEN-GG3-ESTIMATE-FAIL]`. Only Granted Pro leads are promised a consultant review, because nobody reviews the other tiers.
+**Why:** The one cached prompt told gg3 sessions to call a tool they don't have. With an env-based tool list, legacy sessions open at a flip would lose the tool mid-chat. `no_matches` was being reported as a failure, and before gg3's change it was told "programs match".
+**Impact:** `load-agents.js`, `client.js`, `definitions.js`, `lead-gen-context.js`, `lead-gen-gg3-estimate.js`, `lead-gen-finalization.js` (Note builder now exported for tests), the three Variant B files, `docs/lead-gen.md`, tests. No flip and no legacy removal.
+
 ## 2026-11-04 — Oracle searches Granted Files (`search_granted_files`)
 **What:** a new Oracle-only tool runs semantic search over the Granted Files index (`src/services/rag/search.js`, `src/tools/granted-files-search.js`), always loaded rather than deferred.
 - Search: cosine top 30, reranked with Voyage `rerank-2.5-lite`, with floors (0.5 after rerank).

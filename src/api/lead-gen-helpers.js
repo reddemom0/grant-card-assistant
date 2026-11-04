@@ -361,8 +361,8 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
  *   - gg3 estimate status "ok" → computeBestFitProduct on the estimate,
  *     formatted with its exact low first, so the $15,000 Starter threshold
  *     reads estimate.low.
- *   - anything else (confirm_needed, insufficient_profile, unavailable,
- *     timeout) → computeBestFitProduct with no estimate, which is the size
+ *   - anything else (confirm_needed, no_matches, insufficient_profile,
+ *     unavailable, timeout) → computeBestFitProduct with no estimate, which is the size
  *     rule alone: Pro gate → Granted Pro, else Get Granted.
  *
  * Nonprofit and not_a_fit win either way; the rules are computeBestFitProduct's.

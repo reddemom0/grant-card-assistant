@@ -10,6 +10,29 @@ import { describeRecommendedProduct } from '../api/lead-gen-helpers.js';
 import { describeGg3Estimate, isGg3Session } from '../services/lead-gen-gg3-estimate.js';
 
 /**
+ * The session's matcher stamp, set once at session creation
+ * (createLeadGenSessionWithFormData). It decides the prompt variant and the
+ * tool list, so a session keeps one mode however LEAD_GEN_MATCHER changes.
+ * No row, no stamp or a failed read → legacy, as every other reader treats it.
+ *
+ * @param {string} conversationId - Lead-gen session ID
+ * @returns {Promise<'gg3'|'legacy'>}
+ */
+export async function getLeadGenMatcher(conversationId) {
+  if (!conversationId) return 'legacy';
+  try {
+    const result = await query(
+      `SELECT prospect_data FROM lead_gen_conversations WHERE session_id = $1`,
+      [conversationId]
+    );
+    return isGg3Session(result.rows[0]?.prospect_data) ? 'gg3' : 'legacy';
+  } catch (err) {
+    console.warn(`⚠️  Could not read the lead-gen matcher for ${conversationId} (using legacy):`, err.message);
+    return 'legacy';
+  }
+}
+
+/**
  * Load lead-gen form data and company background for a session.
  *
  * Returns formatted context string to inject into agent system prompt, or null if no data found.
@@ -71,7 +94,7 @@ export async function getLeadGenFormContext(conversationId) {
     context += `${describeRecommendedProduct(prospectData)}\n`;
     // gg3 mode: the stored estimate, exact figures, every turn.
     if (isGg3Session(prospectData)) {
-      context += `${describeGg3Estimate(prospectData.gg3_estimate)}\n`;
+      context += `${describeGg3Estimate(prospectData.gg3_estimate, { bestFitProduct: prospectData.best_fit_product })}\n`;
     }
     if (prospectData.hiring_plans) {
       context += `Hiring Plans: ${prospectData.hiring_plans}\n`;

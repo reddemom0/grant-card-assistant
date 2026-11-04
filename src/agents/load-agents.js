@@ -21,12 +21,38 @@ function getAgentsDirectory() {
 }
 
 /**
+ * Keep the prompt text for one lead-gen matcher and drop the other's.
+ *
+ * Variant B marks matcher-specific text with whole-line HTML comments:
+ *   <!-- legacy-matcher --> … <!-- /legacy-matcher -->  (search_getgranted path)
+ *   <!-- gg3-matcher --> … <!-- /gg3-matcher -->        (precomputed estimate)
+ * The kept blocks lose only their marker lines, so a legacy session's prompt
+ * is byte-for-byte the unmarked text. The dropped blocks go whole; in gg3 mode
+ * the blank lines they leave are collapsed.
+ *
+ * @param {string} text - one prompt file's contents
+ * @param {'legacy'|'gg3'} [matcher] - anything but 'gg3' means legacy
+ * @returns {string}
+ */
+export function selectMatcherBlocks(text, matcher = 'legacy') {
+  const keep = matcher === 'gg3' ? 'gg3' : 'legacy';
+  const drop = keep === 'gg3' ? 'legacy' : 'gg3';
+  const dropBlock = new RegExp(`^<!-- ${drop}-matcher -->\\n[\\s\\S]*?^<!-- \\/${drop}-matcher -->\\n`, 'gm');
+  const keepMarker = new RegExp(`^<!-- \\/?${keep}-matcher -->\\n`, 'gm');
+  const out = text.replace(dropBlock, '').replace(keepMarker, '');
+  return keep === 'gg3' ? out.replace(/\n{3,}/g, '\n\n') : out;
+}
+
+/**
  * Load agent prompt from .claude/agents/{agentType}.md
  * @param {string} agentType - Type of agent (e.g., 'grant-card-generator', 'etg-writer')
+ * @param {Object} [opts]
+ * @param {'legacy'|'gg3'} [opts.matcher] - lead-gen Variant B only: the
+ *   session's matcher stamp (getLeadGenMatcher). Defaults to legacy.
  * @returns {string} Agent system prompt
  * @throws {Error} If agent definition file not found
  */
-export function loadAgentPrompt(agentType) {
+export function loadAgentPrompt(agentType, { matcher = 'legacy' } = {}) {
   // A/B Testing: Support variant switching for lead-gen agent
   let agentFileName = `${agentType}.md`;
   let variant = null;
@@ -55,12 +81,12 @@ export function loadAgentPrompt(agentType) {
           );
         }
 
-        return fs.readFileSync(skillPath, 'utf-8').trim();
+        return selectMatcherBlocks(fs.readFileSync(skillPath, 'utf-8'), matcher).trim();
       });
 
       const concatenated = skillContents.join('\n\n---\n\n');
 
-      console.log(`✓ Loaded agent prompt: ${agentType} VARIANT ${variant} (${skillFiles.length} skill files, ${concatenated.length} chars)`);
+      console.log(`✓ Loaded agent prompt: ${agentType} VARIANT ${variant} matcher=${matcher === 'gg3' ? 'gg3' : 'legacy'} (${skillFiles.length} skill files, ${concatenated.length} chars)`);
 
       return concatenated;
     } else {
@@ -177,15 +203,17 @@ export function getAgentMetadata() {
  */
 const promptCache = new Map();
 
-export function loadAgentPromptCached(agentType) {
-  if (process.env.NODE_ENV === 'production' && promptCache.has(agentType)) {
-    return promptCache.get(agentType);
+export function loadAgentPromptCached(agentType, { matcher } = {}) {
+  // lead-gen has one prompt per matcher; every other agent has one prompt.
+  const cacheKey = agentType === 'lead-gen' ? `${agentType}:${matcher === 'gg3' ? 'gg3' : 'legacy'}` : agentType;
+  if (process.env.NODE_ENV === 'production' && promptCache.has(cacheKey)) {
+    return promptCache.get(cacheKey);
   }
 
-  const prompt = loadAgentPrompt(agentType);
+  const prompt = loadAgentPrompt(agentType, agentType === 'lead-gen' ? { matcher } : {});
 
   if (process.env.NODE_ENV === 'production') {
-    promptCache.set(agentType, prompt);
+    promptCache.set(cacheKey, prompt);
   }
 
   return prompt;

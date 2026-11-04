@@ -118,6 +118,22 @@ describe('formatEstimateRange', () => {
 describe('fetchLeadGenEstimate', () => {
   const pd = { province: 'Ontario', industry: 'Construction', training_budget: 'Under $10K' };
 
+  test('no_matches is kept as its own status, with no figure', async () => {
+    const matchLead = jest.fn(async () => ({
+      ok: true, status: 'ok', grants: [], inputs_used: {}, dropped: [],
+      estimate: { status: 'no_matches', low: null, high: null, per_goal: [], matches_used: 0, notes: ['nothing to estimate from'] }
+    }));
+    const r = await fetchLeadGenEstimate(pd, { matchLead, env: {} });
+    expect(r).toMatchObject({ status: 'no_matches', low: null, high: null, matches_used: 0, notes: ['nothing to estimate from'] });
+    expect(estimatedFundingFromGg3(r)).toBeNull();
+  });
+
+  test('an estimate status gg3 might add later still reads as unavailable', async () => {
+    const matchLead = jest.fn(async () => ({ ok: true, status: 'ok', grants: [], estimate: { status: 'something_new', low: 1, high: 2 } }));
+    const r = await fetchLeadGenEstimate(pd, { matchLead, env: {} });
+    expect(r).toMatchObject({ status: 'unavailable', low: null, high: null });
+  });
+
   test('passes the estimate through, with the lead-gen timeout', async () => {
     const matchLead = jest.fn(async () => ({
       ok: true, status: 'ok', estimate: OK_EST,
@@ -162,6 +178,22 @@ describe('describeGg3Estimate — what the model sees', () => {
     expect(text).toMatch(/never calculate/);
     expect(text).toMatch(/Never name programs/);
   });
+  test('no_matches, Granted Pro: no strong fit, a consultant will review', () => {
+    const text = describeGg3Estimate({ status: 'no_matches' }, { bestFitProduct: 'Granted Pro' });
+    expect(text).toMatch(/couldn't find a strong fit from what they've shared/);
+    expect(text).toMatch(/say a consultant will review their profile/);
+    expect(text).not.toMatch(/There are programs that match/);
+    expect(extractDollarFigures(text)).toEqual([]);
+  });
+  test.each(['Get Granted', 'Granted Starter', 'Nonprofit', 'Not a Fit', undefined])(
+    'no_matches, %s: no strong fit yet, and no review promise', (bestFitProduct) => {
+      const text = describeGg3Estimate({ status: 'no_matches' }, { bestFitProduct });
+      expect(text).toMatch(/couldn't find a strong fit from what they've shared yet/);
+      expect(text).not.toMatch(/say a consultant will review/);
+      expect(text).toMatch(/Do not promise that anyone will review their profile/);
+      expect(text).not.toMatch(/There are programs that match/);
+      expect(extractDollarFigures(text)).toEqual([]);
+    });
   test('confirm_needed: matching programs exist, no figure', () => {
     const text = describeGg3Estimate({ status: 'confirm_needed' });
     expect(text).toMatch(/programs that match their profile/);

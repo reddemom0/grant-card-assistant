@@ -321,7 +321,7 @@ function buildNoteBody(sessionData, trigger) {
  * @param {string} trigger - 'estimate_delivered' | 'contact_captured' | 'inactivity_timeout'
  * @returns {string} Plain text note body
  */
-function buildNoteBodyComprehensive(sessionData, trigger) {
+export function buildNoteBodyComprehensive(sessionData, trigger) {
   const {
     prospect_data,
     company_background,
@@ -503,6 +503,8 @@ function buildNoteBodyComprehensive(sessionData, trigger) {
       }
     } else if (gg3Est.status === 'confirm_needed') {
       lines.push('No figure given — matching programs exist, amounts to be confirmed.');
+    } else if (gg3Est.status === 'no_matches') {
+      lines.push('No figure given — gg3 found nothing to estimate from (no_matches).');
     } else {
       lines.push(`No figure given — estimate ${gg3Est.status}${gg3Est.reason ? ` (${gg3Est.reason})` : ''}.`);
     }
@@ -766,8 +768,8 @@ function buildNoteBodyComprehensive(sessionData, trigger) {
  * @param {Object} [gg3Estimate] - gg3 matcher only: the stored
  *                                 prospect_data.gg3_estimate. When given, it is
  *                                 the only source of figures (total + per goal,
- *                                 formatEstimateRange); confirm_needed and
- *                                 unavailable get no figure.
+ *                                 formatEstimateRange); confirm_needed,
+ *                                 no_matches and unavailable get no figure.
  * @returns {string} HTML email content
  */
 export function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null, bestFitProduct = null, gg3Estimate = null) {
@@ -847,6 +849,11 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
       }
     } else if (gg3Estimate.status === 'confirm_needed') {
       fundingSummary = `<p>Based on what you shared, there are programs that match your profile. We confirm the amounts when we review them with you.</p>`;
+    } else if (gg3Estimate.status === 'no_matches') {
+      // Only Granted Pro leads get a consultant review; nobody else is promised one.
+      fundingSummary = effectiveBfp === 'Granted Pro'
+        ? `<p>Based on what you've shared, we couldn't find a strong fit yet. A consultant will review your profile.</p>`
+        : `<p>We couldn't find a strong fit from what you've shared yet.</p>`;
     }
     // unavailable / insufficient_profile: no estimate paragraph, no figure.
   } else if (hasMergedEstimate) {

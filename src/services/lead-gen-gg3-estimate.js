@@ -113,7 +113,10 @@ export function estimatedFundingFromGg3(est) {
  * Call match-lead and reduce the answer to what the session stores. Never
  * throws: failure or timeout → status "unavailable" with the reason.
  *
- * @returns {Promise<{status: 'ok'|'confirm_needed'|'insufficient_profile'|'unavailable',
+ * no_matches (gg3 found nothing to estimate from) is kept as its own status;
+ * any other estimate status gg3 might add later still reads as unavailable.
+ *
+ * @returns {Promise<{status: 'ok'|'confirm_needed'|'no_matches'|'insufficient_profile'|'unavailable',
  *   low: number|null, high: number|null, per_goal: Array, matches_used: number|null,
  *   revenue_band_used: string|null, notes: string[], inputs_used: object|null,
  *   dropped: Array, cards: Array<{name, provider}>, missing?: string[], reason?: string,
@@ -143,7 +146,7 @@ export async function fetchLeadGenEstimate(prospectData, { matchLead = defaultMa
     return { ...base, status: 'insufficient_profile', missing: r.missing || [], inputs_used: r.inputs_used || null, dropped: r.dropped || [] };
   }
   const est = r.estimate;
-  if (!est || (est.status !== 'ok' && est.status !== 'confirm_needed')) {
+  if (!est || !['ok', 'confirm_needed', 'no_matches'].includes(est.status)) {
     // A gg3 deploy without the estimate block answers ok with no estimate.
     return { ...base, status: 'unavailable', reason: 'match-lead returned no estimate block', inputs_used: r.inputs_used || null, dropped: r.dropped || [] };
   }
@@ -165,8 +168,14 @@ export async function fetchLeadGenEstimate(prospectData, { matchLead = defaultMa
 
 // ── What the model sees ─────────────────────────────────────────────────────
 
-/** The <lead_info> block for a gg3 session. */
-export function describeGg3Estimate(est) {
+/**
+ * The <lead_info> block for a gg3 session.
+ * @param {Object} est - prospect_data.gg3_estimate
+ * @param {Object} [opts]
+ * @param {string} [opts.bestFitProduct] - the locked tier. Only Granted Pro
+ *   leads are reviewed by a consultant, so only they are promised a review.
+ */
+export function describeGg3Estimate(est, { bestFitProduct } = {}) {
   const lines = [];
   if (est?.status === 'ok') {
     lines.push('Funding estimate (computed by the system; use these exact figures, never calculate, round, re-range or adjust them; this overrides any estimation method elsewhere in your instructions):');
@@ -178,10 +187,16 @@ export function describeGg3Estimate(est) {
     }
   } else if (est?.status === 'confirm_needed') {
     lines.push('Funding estimate: no dollar figure. There are programs that match their profile; say so, and say the amounts get confirmed when we review them. Give no dollar figure and do not invent one.');
+  } else if (est?.status === 'no_matches') {
+    // Zero matches and too-little-information look the same from here, so the
+    // wording has to be honest for both.
+    lines.push(bestFitProduct === 'Granted Pro'
+      ? "Funding estimate: no dollar figure. We couldn't find a strong fit from what they've shared; say so plainly, and say a consultant will review their profile. Do not say programs match them. Give no dollar figure and do not invent one."
+      : "Funding estimate: no dollar figure. We couldn't find a strong fit from what they've shared yet; say so plainly. Do not promise that anyone will review their profile, and do not say programs match them. Give no dollar figure and do not invent one.");
   } else {
     lines.push("Funding estimate: not available. Give no dollar figure and don't claim specific matches; say we'll confirm what's available for them. Do not invent a figure.");
   }
-  lines.push('The estimate is already computed: search_getgranted is not available. Never name programs.');
+  lines.push('The estimate is already computed; there is no program search to run. Never name programs.');
   return lines.join('\n');
 }
 
