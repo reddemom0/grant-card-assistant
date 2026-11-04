@@ -17,6 +17,17 @@ Format:
 **Why:** The chat's wording ("Healthcare/Medical Laboratory Services") had replaced the widget's pick, and match-lead rejected it. This is the `employee_count_stated` fix, except an empty value is still filled: chat-only sessions (`createLeadGenSession`) have no other industry source, and the Nonprofit rule, the Pro gate and booking routing read `industry`.
 **Impact:** `src/tools/executor.js`, `tests/unit/lead-gen-memory-store-industry.test.js`, `docs/lead-gen.md`, gg3-ai-service `ux-seam.open-questions.md` item 19. No backfill.
 
+## 2026-11-04 — Granted Files index: nightly updater from its own change-feed position
+**What:** `src/services/rag/nightly.js` + `changes.js` keep `drive_files` / `drive_chunks` current at 02:00 PT. They read the Drive change feed from a position stored in `rag_runs` (migration 060), separate from the filing sweep's. The updater:
+- expands moved folders;
+- marks trashed files `removed` (a new status; the row stays);
+- rehomes a leaving canonical's chunks to the best allowed copy before removing or reprocessing it;
+- keeps the old position when a run stops at the ceiling (5M) or fails.
+
+Off unless `RAG_NIGHTLY_ENABLED=true`.
+**Why:** `planRun` is right for a full listing but not a delta: it leaves files moved into an excluded area searchable and never re-picks a canonical. Rows are kept rather than deleted because `duplicate_of ON DELETE SET NULL` would turn copies into fake canonicals. The sweep's change-feed code wasn't shared because `filing-sweep.js` lacks md5, modifiedTime and removals, and it has uncommitted work.
+**Impact:** `src/services/rag/{nightly,changes,store,indexer}.js`, `scripts/rag-index.mjs --nightly`, `server.js`, `migrations/060_rag_runs.sql`, `docs/granted-files-index.md`.
+
 ## 2026-11-04 — Hub industry vocabulary synced to gg3 5220e2e (17 industries)
 **What:** `src/control-centre/industry-vocabulary.js` re-copied from gg3 `vocabulary.ts` @ `5220e2e`:
 - the new `Defence & Aerospace` main;

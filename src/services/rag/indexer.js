@@ -86,7 +86,7 @@ export function chooseCanonical(group) {
 }
 
 const sameTime = (a, b) => Boolean(a && b) && new Date(a).getTime() === new Date(b).getTime();
-const indexable = (f) => Boolean(ragKind(f.mimeType, f.name)) && !exclusionReason({ path: f.path, name: f.name });
+export const indexable = (f) => Boolean(ragKind(f.mimeType, f.name)) && !exclusionReason({ path: f.path, name: f.name });
 
 /**
  * What to do with each listed file.

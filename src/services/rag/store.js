@@ -97,15 +97,127 @@ export async function updateMove(row) {
 
 /** Progress and totals (read-only). `since` limits "touched" counts to one run. */
 export async function status(since = null) {
-  const [byStatus, chunks, failures, touched] = await Promise.all([
+  const [byStatus, chunks, failures, touched, runs] = await Promise.all([
     query(`SELECT status, (duplicate_of IS NOT NULL) AS duplicate, count(*)::int n, coalesce(sum(token_count), 0)::bigint tokens
            FROM drive_files GROUP BY 1, 2 ORDER BY 1, 2`),
     query(`SELECT count(*)::int chunks, count(embedding)::int embedded, coalesce(sum(token_count), 0)::bigint tokens FROM drive_chunks`),
     query(`SELECT status_reason, count(*)::int n FROM drive_files WHERE status = 'failed' GROUP BY 1 ORDER BY 2 DESC LIMIT 20`),
     since ? query(`SELECT count(*)::int n, min(last_indexed_at) first, max(last_indexed_at) last FROM drive_files WHERE last_indexed_at >= $1`, [since])
-      : Promise.resolve({ rows: [] })
+      : Promise.resolve({ rows: [] }),
+    recentRuns(5)
   ]);
-  return { byStatus: byStatus.rows, chunks: chunks.rows[0], failures: failures.rows, touched: touched.rows[0] || null };
+  return { byStatus: byStatus.rows, chunks: chunks.rows[0], failures: failures.rows, touched: touched.rows[0] || null, nightly: runs };
+}
+
+// ---------------------------------------------------------------- nightly updater (migration 060)
+
+/** Every live row sharing these md5s, to complete dedupe groups (read-only). */
+export async function groupRows(md5s) {
+  if (!md5s.length) return [];
+  const { rows } = await query(
+    `SELECT file_id, md5, name, path, mime, modified_time, status, duplicate_of FROM drive_files
+     WHERE md5 = ANY($1::text[]) AND status <> 'removed'`,
+    [md5s]
+  );
+  return rows;
+}
+
+/** IDs of live rows at or below a folder path (read-only). */
+export async function rowsUnderPath(prefix) {
+  const { rows } = await query(
+    `SELECT file_id FROM drive_files WHERE status <> 'removed' AND (path = $1 OR left(path, length($1) + 1) = $1 || '/')`,
+    [prefix]
+  );
+  return rows.map(r => r.file_id);
+}
+
+/** Whether any live row sits at or below a folder path (read-only). */
+export async function hasRowsUnder(prefix) {
+  const { rows } = await query(
+    `SELECT EXISTS (SELECT 1 FROM drive_files WHERE status <> 'removed' AND (path = $1 OR left(path, length($1) + 1) = $1 || '/')) AS found`,
+    [prefix]
+  );
+  return rows[0].found;
+}
+
+/** A trashed or deleted file: its chunks go, its row stays as 'removed'. */
+export async function markRemoved(fileId) {
+  await transaction(async (client) => {
+    await client.query('DELETE FROM drive_chunks WHERE file_id = $1', [fileId]);
+    await client.query(
+      `UPDATE drive_files SET status = 'removed', status_reason = NULL, duplicate_of = NULL, chunk_count = 0, updated_at = NOW()
+       WHERE file_id = $1`,
+      [fileId]
+    );
+  }, 'rag remove');
+}
+
+/**
+ * Claim today's run. Null when a run already owns the day: one that is done,
+ * one still building (under 2 hours), or one that failed under 30 minutes ago.
+ */
+export async function claimRun(kind, localDate, tokenBefore) {
+  const { rows } = await query(
+    `INSERT INTO rag_runs (kind, local_date, page_token_before) VALUES ($1, $2, $3)
+     ON CONFLICT (local_date) DO UPDATE SET kind = EXCLUDED.kind, status = 'building', page_token_before = EXCLUDED.page_token_before,
+       page_token_after = NULL, counts = '{}'::jsonb, tokens = 0, cost_usd = 0, errors = 0, error_code = NULL,
+       started_at = NOW(), completed_at = NULL
+     WHERE rag_runs.status = 'stopped'
+        OR (rag_runs.status = 'failed' AND rag_runs.started_at < NOW() - INTERVAL '30 minutes')
+        OR (rag_runs.status = 'building' AND rag_runs.started_at < NOW() - INTERVAL '2 hours')
+     RETURNING id`,
+    [kind, localDate, tokenBefore]
+  );
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * Where the next run reads from: a done run's page_token_after, or the
+ * unconsumed page_token_before of a run that stopped or failed after it.
+ */
+export async function lastToken() {
+  const { rows } = await query(
+    `SELECT CASE WHEN status = 'done' THEN page_token_after ELSE page_token_before END AS token FROM rag_runs
+     WHERE status IN ('done', 'stopped', 'failed')
+       AND (CASE WHEN status = 'done' THEN page_token_after ELSE page_token_before END) IS NOT NULL
+     ORDER BY started_at DESC LIMIT 1`
+  );
+  return rows[0]?.token ?? null;
+}
+
+/** status: done | stopped | failed. tokenAfter only for done. */
+export async function finishRun(id, { status, tokenAfter = null, counts = {}, tokens = 0, usd = 0, errors = 0, errorCode = null }) {
+  await query(
+    `UPDATE rag_runs SET status = $2, page_token_after = $3, counts = $4::jsonb, tokens = $5, cost_usd = $6, errors = $7,
+       error_code = $8, completed_at = NOW() WHERE id = $1`,
+    [id, status, status === 'done' ? tokenAfter : null, JSON.stringify(counts), tokens, usd, errors, errorCode]
+  );
+}
+
+/** Latest runs for --status; null before migration 060. */
+export async function recentRuns(n = 5) {
+  try {
+    const { rows } = await query(
+      `SELECT kind, local_date, status, started_at, completed_at, counts, tokens, cost_usd, errors, error_code
+       FROM rag_runs ORDER BY started_at DESC LIMIT $1`,
+      [n]
+    );
+    return rows;
+  } catch (err) {
+    if (err?.code === '42P01') return null;
+    throw err;
+  }
+}
+
+/** The filing sweep's position at or before `since`, borrowed read-only for --since. */
+export async function sweepTokenAtOrBefore(since) {
+  const { rows } = await query(
+    `SELECT page_token_after, completed_at FROM filing_sweep_runs
+     WHERE kind = 'sweep' AND status = 'done' AND page_token_after IS NOT NULL AND completed_at <= $1
+     ORDER BY completed_at DESC LIMIT 1`,
+    [since]
+  );
+  return rows[0] ? { token: rows[0].page_token_after, at: rows[0].completed_at } : null;
 }
 
 /** Exact cosine search (no index). Returns the closest chunks with file name and path. */

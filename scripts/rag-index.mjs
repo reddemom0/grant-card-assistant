@@ -19,7 +19,12 @@
  *   --dry                list, plan and estimate only: no embeddings, no DB writes
  *   --no-db              with --dry: don't read the DB (it isn't reachable locally)
  *   --resume             also retry files whose last attempt failed
- *   --status [--since ISO]   progress and totals from the DB (read-only)
+ *   --status [--since ISO]   progress, totals and recent nightly runs from the DB (read-only)
+ *   --nightly [--dry] [--since ISO] [--max-tokens N]
+ *                        one nightly-updater run (src/services/rag/nightly.js) from its stored
+ *                        position; --since reads from the filing sweep's last position at or
+ *                        before that time and keeps changes at or after it; --dry plans only
+ *                        (no claim, no embeddings, no DB writes)
  *   --search "<q>"       repeatable; top 3 chunks by exact cosine (read-only)
  *   --as you@granted.ca  Drive identity (default writers@granted.ca)
  *
@@ -77,6 +82,22 @@ async function main() {
       console.log(`\nQ: ${q}   (SQL ${ms} ms)`);
       for (const h of hits) console.log(`  ${Number(h.score).toFixed(3)}  ${h.name}  [${h.locator || '-'}]  ${h.area}${h.year ? ` ${h.year}` : ''}`);
     }
+    process.exit(0);
+  }
+
+  if (flag('--nightly')) {
+    loadEnv({ google: true, voyage: !dry });
+    const { runNightly, defaultDeps } = await import('../src/services/rag/nightly.js');
+    const { logLine } = await import('../src/services/rag/indexer.js');
+    const calls = {};
+    const deps = await defaultDeps(process.env, {
+      as: values('--as')[0] || 'writers@granted.ca',
+      onCall: (method) => { calls[method] = (calls[method] || 0) + 1; },
+      onRetry: ({ attempt, status, ms }) => console.log(logLine('retry', { attempt, code: String(status), ms_wait: ms }))
+    });
+    const result = await runNightly({ deps, dry, since: values('--since')[0] || null, maxTokens: number('--max-tokens', null) });
+    console.log(`\nNightly${dry ? ' (dry: no claim, no embeddings, no DB writes)' : ''}: ${JSON.stringify(result, null, 1)}`);
+    console.log(`Drive calls: ${JSON.stringify(calls)}`);
     process.exit(0);
   }
 

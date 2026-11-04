@@ -79,6 +79,7 @@ import { startPulseRoundup } from './src/services/pulse-roundup.js';
 import { startRukBriefings } from './src/services/ruk-briefings.js';
 import { startStephBrief } from './src/services/steph-brief.js';
 import { startFilingSweep } from './src/services/filing-sweep.js';
+import { startRagNightly } from './src/services/rag/nightly.js';
 import { stephBriefRunEndpoint } from './src/api/steph-brief-run.js';
 import { startPulseDigest } from './src/services/pulse-digest.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
@@ -1460,6 +1461,11 @@ async function startServer() {
     // 08:45 summary to Chris. Off unless FILING_SWEEP_ENABLED=true;
     // FILING_SWEEP_PILOT_EMAILS limits who gets DMs. Needs migration 055.
     startFilingSweep(cron);
+
+    // Granted Files index (RAG): 02:00 nightly, brings drive_files / drive_chunks
+    // up to date from the Drive change feed. Off unless RAG_NIGHTLY_ENABLED=true;
+    // RAG_NIGHTLY_MAX_TOKENS caps a run (default 5M). Needs migrations 056 and 060.
+    startRagNightly(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';

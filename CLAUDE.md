@@ -20,6 +20,7 @@ for what you are working on before you touch anything.
 | Oracle + Hub agents | `docs/oracle.md` |
 | Lead-gen agent | `docs/lead-gen.md` |
 | Control Centre | `docs/control-centre.md` |
+| Granted Files index (RAG) | `docs/granted-files-index.md` |
 
 The matching engine, tagger, and GetGranted chat agent live in the sibling repo
 `gg3-ai-service`, with their own blueprints. `gg3-ai-api-backend` is Jason's — gateway and
