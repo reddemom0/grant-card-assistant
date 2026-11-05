@@ -66,11 +66,44 @@ test('website REQUIRED_FIELD → one retry with the email domain', async () => {
   expect(r).toMatchObject({ success: true, repaired: { website: 'https://acme.ca' } });
   const retried = axios.post.mock.calls[1][1].fields;
   expect(retried.find((f) => f.name === 'website').value).toBe('https://acme.ca');
+  expect(retried.some((f) => f.value === 'N/A')).toBe(false);
 });
 
-test('website REQUIRED_FIELD with a free-mail address → rejected, no guessed website', async () => {
+test('no website + free-mail address → one retry with website "N/A"', async () => {
+  const axios = { post: jest.fn()
+    .mockRejectedValueOnce(httpError(400, WEBSITE_REQUIRED))
+    .mockResolvedValueOnce({ status: 200, data: {} }) };
+  const r = await submitLeadGenForm(session('pat@gmail.com'), null, axios, noSleep);
+  expect(r).toMatchObject({ success: true, repaired: { website: 'N/A' } });
+  expect(axios.post).toHaveBeenCalledTimes(2);
+  expect(axios.post.mock.calls[0][1].fields.some((f) => f.name === 'website')).toBe(false);
+  const retried = axios.post.mock.calls[1][1].fields;
+  expect(retried.filter((f) => f.name === 'website')).toEqual([{ objectTypeId: '0-1', name: 'website', value: 'N/A' }]);
+});
+
+test('"N/A" retry also rejected → rejected, returned fields carry no website for the upsert', async () => {
   const axios = { post: jest.fn().mockRejectedValue(httpError(400, WEBSITE_REQUIRED)) };
   const r = await submitLeadGenForm(session('pat@gmail.com'), null, axios, noSleep);
+  expect(r).toMatchObject({ success: false, rejected: true });
+  expect(axios.post).toHaveBeenCalledTimes(2);
+  expect(r.fields.some((f) => f.name === 'website')).toBe(false);
+});
+
+test('lead with a website → sent unchanged, no retry', async () => {
+  const axios = { post: jest.fn().mockResolvedValue({ status: 200, data: {} }) };
+  const s = { ...session('pat@gmail.com'), company_website: 'https://patsbakery.ca' };
+  const r = await submitLeadGenForm(s, null, axios, noSleep);
+  expect(r.success).toBe(true);
+  expect(r.repaired).toBeUndefined();
+  expect(axios.post).toHaveBeenCalledTimes(1);
+  expect(axios.post.mock.calls[0][1].fields.find((f) => f.name === 'website').value).toBe('https://patsbakery.ca');
+});
+
+test('entered website rejected + free-mail address → not replaced with "N/A"', async () => {
+  const INVALID = { status: 'error', message: 'The request is not valid', errors: [{ message: "Invalid value for field 'website'", errorType: 'INVALID_FIELD' }] };
+  const axios = { post: jest.fn().mockRejectedValue(httpError(400, INVALID)) };
+  const s = { ...session('pat@gmail.com'), company_website: 'https://bad' };
+  const r = await submitLeadGenForm(s, null, axios, noSleep);
   expect(r).toMatchObject({ success: false, rejected: true });
   expect(axios.post).toHaveBeenCalledTimes(1);
 });

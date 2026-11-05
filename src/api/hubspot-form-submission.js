@@ -38,6 +38,10 @@ const HUBSPOT_FORM_SUBMIT_URL =
   `https://api.hsforms.com/submissions/v3/integration/submit/${HUBSPOT_PORTAL_ID}/${HUBSPOT_LEAD_GEN_FORM_GUID}`;
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
+
+// Sent as `website` when the form demands one and the lead has none (the
+// widget's "I don't have a website yet") and no company email domain.
+const NO_WEBSITE_VALUE = 'N/A';
 const SUBMISSION_SOURCE_VALUE = 'AI Grant Calculator Chat';
 
 // ============================================================================
@@ -148,7 +152,7 @@ export function buildFormFields(sessionData, agentInput) {
     { name: 'lastname',                                                                          value: lastname  || null },
     { name: 'email',                                                                             value: email     || null },
     { name: 'company',                                                                           value: company   || null },
-    { name: 'website',                                                                           value: website }, // null when "no website" checked → omitted
+    { name: 'website',                                                                           value: website }, // null when "no website" checked → omitted; submitLeadGenForm repairs a rejection
     { name: 'industry_contact',                                                                  value: industry ? mapIndustry(industry) : null },
     { name: 'how_did_you_hear_about_us_',                                                        value: 'Other' }, // submission_source covers attribution more precisely
     { name: 'who_referred_you_',                                                                 value: referralSource || null },
@@ -268,22 +272,28 @@ export async function submitLeadGenForm(sessionData, agentInput, axiosLib = null
   console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} status=${attempt.status ?? 'none'} errors=${JSON.stringify(errors)} message="${attempt.error}"`);
 
   // 2. One repaired retry for a missing or invalid website: the company's
-  //    email domain, unless it's a free-mail domain.
+  //    email domain, unless it's a free-mail domain. A lead with no website
+  //    and no usable domain gets "N/A" — the form requires the field. A
+  //    website the lead entered is never replaced with "N/A". The repaired
+  //    value lives only in this retry; the returned `fields` (which the CRM
+  //    upsert fallback reads) never carry it.
   if (errors.some((e) => e.field === 'website')) {
-    const website = websiteFromEmail(sessionData.contact_email || agentInput?.email);
+    const hadNoWebsite = !fields.some((f) => f.name === 'website');
+    const fromEmail = websiteFromEmail(sessionData.contact_email || agentInput?.email);
+    const website = fromEmail || (hadNoWebsite ? NO_WEBSITE_VALUE : null);
     if (website) {
       const repairedFields = [
         ...fields.filter((f) => f.name !== 'website'),
         { objectTypeId: '0-1', name: 'website', value: website }
       ];
-      console.log(`🔧 Retrying HubSpot form with website=${website} (from the email domain)`);
+      console.log(`🔧 Retrying HubSpot form with website=${website} (${fromEmail ? 'from the email domain' : 'no website, free-mail or unreadable email domain'})`);
       attempt = await postFormWithRetry(axios, { ...payload, fields: repairedFields }, sessionData.contact_email, sleep);
       if (attempt.success) {
         return { ...attempt, fieldCount: repairedFields.length, repaired: { website } };
       }
       console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} repaired retry also rejected: ${JSON.stringify(parseFormErrors(attempt.details))}`);
     } else {
-      console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} website required but the email domain is free-mail or unreadable — no repair`);
+      console.error(`[HUBSPOT-FORM-REJECTED] email=${sessionData.contact_email} website rejected but the email domain is free-mail or unreadable — no repair`);
     }
   }
 

@@ -181,7 +181,7 @@ Both prompts (`.claude/agents/lead-gen.md`, Variant B `system-operations.md`) ca
 
 `submitLeadGenForm` (`src/api/hubspot-form-submission.js`) no longer gives up on the first failure. Both modes:
 1. **Transient failures** (no response, 5xx, 429) are retried twice (1 s, 3 s). A 4xx isn't retried as-is.
-2. **A rejection naming `website`** (`parseFormErrors`) is retried once with `https://<email domain>`. Free-mail domains get no repair. The forms token lacks the forms scope, so the form's required fields could not be read; this is keyed off HubSpot's error message, not the schema.
+2. **A rejection naming `website`** (`parseFormErrors`) is retried once with `https://<email domain>`. A lead with no website (the widget's "I don't have a website yet") and a free-mail or unreadable domain is retried with `website: "N/A"` instead. A website the lead entered is never replaced with "N/A", and the CRM upsert fallback never receives it. The forms token lacks the forms scope, so the form's required fields could not be read; this is keyed off HubSpot's error message, not the schema.
 3. **Still rejected:** finalization logs `[HUBSPOT-FORM-REJECTED]` and calls `upsertLeadGenContact`. That upserts the Contact by email via `/crm/v3/objects/contacts/batch/upsert`: first with every form field, then with core identity fields only. The PATCH, Note and email then carry on. The lead has no form-submission event (reporting bucket).
 4. **The outcome** is written to `prospect_data.hubspot_sync = { form: submitted|repaired|rejected, fallback: none|crm_upsert|failed, errors, at }`. If even the upsert fails, `[HUBSPOT-LEAD-LOST-RISK]` is logged.
 

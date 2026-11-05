@@ -10,6 +10,11 @@ Format:
 **Impact:** files/systems touched
 ```
 
+## 2026-11-05 — Lead-gen: "N/A" website on the HubSpot form for leads with no website
+**What:** When the calculator form rejects a submission for `website`, the lead entered none, and the email domain is free-mail or unreadable, `submitLeadGenForm` retries once with `website: "N/A"`. The email-domain repair still comes first. An entered website is never replaced. "N/A" exists only in that retry, so the CRM upsert fallback never writes it. When the form accepts it, HubSpot maps it onto the Contact's `website`.
+**Why:** The form requires `website`. Every no-website, free-mail lead (Right At Home Realty, both Eric's Potatoes tests, V22 Power on 2026-11-04) fell to the core-fields upsert, with no form conversion, firmographics or owner. The fallback was never built: deferred on 2026-07-30 as "HubSpot form 400s on every website-less lead". It is a repair rather than a default in `buildFormFields`, so nothing sends "N/A" if the field becomes optional. The form's own validation can't be read (no forms scope); the CRM property is free text, so "N/A" is expected to pass but is unconfirmed until a live submission.
+**Impact:** `src/api/hubspot-form-submission.js` (`submitLeadGenForm`, `NO_WEBSITE_VALUE`), `tests/unit/hubspot-form-reliability.test.js`, `docs/lead-gen.md`. Last name, enum mapping and past leads are out of scope.
+
 ---
 
 ## 2026-11-04 — Lead-gen: prompt and tools follow the session's matcher; gg3 `no_matches` handled
