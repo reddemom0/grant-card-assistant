@@ -804,9 +804,9 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
 
 <p>Here's where to start:</p>
 
-<p>You can use <a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">GetGranted</a>, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows. It's a good way to start watching what's out there today, even pre-revenue.</p>
+<p>You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows. It's a good way to start watching what's out there today, even pre-revenue.</p>
 
-<p>We're also launching an upgraded platform soon (GetGranted 2.0 Lite) with smart matching and step-by-step guidance. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
+<p><a href="https://app.getgranted.ai/onboarding" style="color: #0066cc; font-weight: bold;">Sign up for GetGranted</a></p>
 
 <p>A couple of resources worth bookmarking too:</p>
 <ul>
@@ -934,7 +934,7 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
 
 <p><a href="https://granted.ca/granted-starter/" style="color: #0066cc; font-weight: bold;">Learn more about Granted Starter</a></p>
 
-<p>We're also launching an upgraded platform soon (GetGranted 2.0) with smart matching and step-by-step guidance. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
+<p>When you're ready, you can <a href="https://app.getgranted.ai/onboarding" style="color: #0066cc; font-weight: bold;">sign up for GetGranted</a> to get started.</p>
     `;
     bookingCTA = routed.link ? `
 <p>If you'd prefer to talk through your options with someone on our team first, you can book a quick call:</p>
@@ -945,13 +945,11 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
     ` : '';
   } else {
     // Regular Get Granted (best_fit_product === 'Get Granted' && service_tier !== 'not_a_fit').
-    // Estimate shown above (if present), database + waitlist content, NO booking.
+    // Estimate shown above (if present), GetGranted sign-up content, NO booking.
     tierContent = `
-<p>Our GetGranted database is a great starting point — you get access to Canada's largest grant database with smart filtering tailored to your business.</p>
+<p>GetGranted, our subscription grant-matching platform, is a great starting point — you get access to Canada's largest grant database with smart filtering tailored to your business.</p>
 
-<p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">Access the GetGranted database</a></p>
-
-<p>We're also launching an upgraded version (GetGranted 2.0 Lite) with real-time matching and alerts. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
+<p><a href="https://app.getgranted.ai/onboarding" style="color: #0066cc; font-weight: bold;">Sign up for GetGranted</a></p>
     `;
     // No bookingCTA for Regular Get Granted. Both lead-in AND URL absent
     // (closes the Small Point dangling-text bug at the source).

@@ -60,7 +60,7 @@
     "keywords": ["too small", "too early", "startup", "new business", "no revenue", "one person", "sole proprietor", "size", "minimum"],
     "knowledge": "There are grants for businesses of many sizes, but real minimum thresholds exist. Key requirements across most programs: you need to be incorporated (sole proprietorships generally don't qualify), you typically need at least one year of operations in Canada, and you need enough cash flow to cover costs up front since grants are reimbursement-based. Pre-revenue companies face the toughest road because the claim-back model requires spending first. 'Too small' and 'too early' are different things — a company doing $500K with 5 employees can absolutely leverage grants. Student/co-op hiring grants are the lowest barrier to entry. Training grants are next. Market expansion grants typically need higher revenue ($300K+) because projects are larger and matching requirements are higher. For businesses not quite ready, the best move is getting informed now so you're ready to move as soon as you hit those thresholds.",
     "database_hook": "Base it on what the prospect has shared. If they qualify, tell them. If they're pre-revenue or under one year, lead with the smaller funding opportunities that may suit their stage (student/co-op hiring and training support are the lowest barrier), then point to GetGranted, then mention the thresholds that open up larger programs.",
-    "cta_bridge": "If they qualify: 'You're in a great spot to start — want to book a call and figure out which programs to prioritize?' If not ready: 'Some of our larger programs may not be the best fit right now, but there may be smaller funding opportunities suited to your stage. You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows.'"
+    "cta_bridge": "If they qualify: 'You're in a great spot to start — want to book a call and figure out which programs to prioritize?' If not ready: 'Some of our larger programs may not be the best fit right now, but there may be smaller funding opportunities suited to your stage. You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows. Sign up at https://app.getgranted.ai/onboarding.'"
   },
   {
     "id": "faq_8",
@@ -102,7 +102,7 @@
     "topic": "getgranted_platform",
     "question": "What is GetGranted?",
     "keywords": ["getgranted", "database", "self-serve", "grant database", "platform", "subscription", "lite", "standard", "plus"],
-    "knowledge": "GetGranted is a paid self-serve grant management platform (NOT free) — currently waitlist-only for the new 2026 launch. Three tiers: **Lite**: 1 user, 3 watchlists, 3 smart filters, chatbot, notifications. Best for solo/micro businesses exploring grants. **GetGranted**: 2 users, 10 watchlists, 10 smart filters, quarterly office hours. Annual unlocks analytics, Grant Navigator, and strategy consulting session. Best for growing businesses with a small team. **Plus**: 3 users, unlimited watchlists/filters, monthly office hours. Annual unlocks unlimited Grant Navigator, strategy consulting session, pay-per-use consulting calls. Best for businesses wanting guided strategic support. Annual plans unlock extra features. When recommending GetGranted, suggest the right tier based on company size. Waitlist: https://getgranted.ca/waitlist/",
+    "knowledge": "GetGranted is our subscription grant-matching platform (paid, not free), live now at https://app.getgranted.ai/. It matches your business to grants you're eligible for, lets you save and track programs, and notifies you when grants open or deadlines change. Never quote a price or name a plan. Sign up at https://app.getgranted.ai/onboarding.",
     "cta_bridge": "If you want more hands-on support beyond the platform, we have Granted Starter and GrantedPro. Want me to walk you through those options?"
   },
   {
@@ -110,7 +110,7 @@
     "topic": "granted_starter_current",
     "question": "What is Granted Starter?",
     "keywords": ["starter", "granted starter", "self-serve", "application tool", "streamlined"],
-    "knowledge": "Granted Starter is a self-serve grant application tool with streamlined forms and administration support. It includes full access to the grant database (browse, matching, notifications) PLUS 3 Grant Tokens per year for streamlined applications. Here's the key distinction: you can browse the database and research grants anytime without using a token. Tokens are only used when you want Granted's streamlined application prep and claims support. You can also apply for grants on your own using what you learn from the database — you just won't get application assistance or claims service for those. When you use a token: Granted prepares the complete application and communications on your behalf. You submit from your own email or the grantor's portal for full transparency. If not approved on first submission, Granted adjusts and resubmits at no cost. If ultimately not approved, your token is returned and no success fee is charged. 3 Grant Tokens included per year, renewed on subscription renewal. Covers most hiring and training grants — does NOT cover market expansion grants. Best for: startups or recently incorporated businesses, companies new to grants, businesses with up to 3 grant-eligible activities per year (hiring or training). Starter is evolving into GetGranted 2.0 in 2026 — join the waitlist at https://getgranted.ca/waitlist/ or start now at https://granted.ca/granted-starter/",
+    "knowledge": "Granted Starter is a self-serve grant application tool with streamlined forms and administration support. It includes full access to the grant database (browse, matching, notifications) PLUS 3 Grant Tokens per year for streamlined applications. Here's the key distinction: you can browse the database and research grants anytime without using a token. Tokens are only used when you want Granted's streamlined application prep and claims support. You can also apply for grants on your own using what you learn from the database — you just won't get application assistance or claims service for those. When you use a token: Granted prepares the complete application and communications on your behalf. You submit from your own email or the grantor's portal for full transparency. If not approved on first submission, Granted adjusts and resubmits at no cost. If ultimately not approved, your token is returned and no success fee is charged. 3 Grant Tokens included per year, renewed on subscription renewal. Covers most hiring and training grants — does NOT cover market expansion grants. Best for: startups or recently incorporated businesses, companies new to grants, businesses with up to 3 grant-eligible activities per year (hiring or training). See how it works at https://granted.ca/granted-starter/ and sign up at https://app.getgranted.ai/onboarding.",
     "cta_bridge": "If you're looking for a full done-for-you service, GrantedPro might be a better fit. Want to hear about that?"
   },
   {
@@ -132,25 +132,25 @@
   {
     "id": "faq_16",
     "topic": "getgranted_2_platform",
-    "question": "What is GetGranted 2.0?",
+    "question": "What is the new GetGranted platform?",
     "keywords": ["getgranted 2.0", "new platform", "upcoming", "waitlist", "2026", "upgrade"],
-    "knowledge": "GetGranted 2.0 is an all-in-one grant management platform where businesses can find, save, and apply to grants. Built by grant experts specifically for the Canadian grant landscape, it provides a centralized workspace to track opportunities, manage applications, and stay ahead of deadlines. It combines the functionality of the current GetGranted and Granted Starter into one enhanced platform with smarter tools, faster performance, and a more intuitive interface. Currently in waitlist mode — not yet accepting signups. Current GetGranted and Starter subscribers will have their accounts and data securely transferred when the new platform launches. Waitlist: https://getgranted.ca/waitlist/ Features: https://getgranted.ca/",
-    "cta_bridge": "The new platform is coming soon — you can join the waitlist to get early access. In the meantime, our current services are fully operational and can help you right now."
+    "knowledge": "GetGranted is live: an all-in-one grant platform where businesses can find, save and apply to grants, built by grant experts for the Canadian grant landscape. One workspace to track opportunities, manage applications and stay ahead of deadlines. It brings GetGranted and Granted Starter together on one platform. Sign-ups are open at https://app.getgranted.ai/onboarding.",
+    "cta_bridge": "It's open now — you can sign up at https://app.getgranted.ai/onboarding."
   },
   {
     "id": "faq_17",
     "topic": "getgranted_2_pricing",
-    "question": "How much does GetGranted 2.0 cost?",
+    "question": "How much does GetGranted cost?",
     "keywords": ["getgranted 2.0 price", "pricing", "lite", "plus", "standard", "monthly", "annual"],
-    "knowledge": "GetGranted 2.0 has three tiers. GetGranted Lite (for grant explorers): 1 user, 3 Watchlists, 3 Smart Filters, chatbot access, no office hours. GetGranted (the middle tier for growing teams): 2 users, 10 Watchlists, 10 Smart Filters, quarterly office hours, annual plan unlocks Analytics, Grant Navigator, and Strategy Consulting Session. GetGranted Plus (for guided strategic growth): 3 users, unlimited Watchlists and Smart Filters, monthly office hours, annual plan unlocks Analytics, Unlimited Grant Navigator, Strategy Consulting Session, and pay-per-use consulting calls. Currently waitlist-only at https://getgranted.ca/waitlist/. Never quote a price for GetGranted 2.0 — cost depends on which service fits, and the intro call is where that gets sorted out.",
-    "cta_bridge": "If you're ready to start now instead of waiting for the new platform, I can walk you through our current services."
+    "knowledge": "GetGranted is a paid subscription. Never quote a price, fee or plan name for it. The sign-up at https://app.getgranted.ai/onboarding is where the details are. Offer a call about cost only when the Recommended product is Granted Pro.",
+    "cta_bridge": "You can see the details and sign up at https://app.getgranted.ai/onboarding."
   },
   {
     "id": "faq_18",
     "topic": "grant_navigator_feature",
     "question": "What is Grant Navigator?",
     "keywords": ["grant navigator", "navigator", "expert support", "guided", "dedicated expert"],
-    "knowledge": "Grant Navigator is a feature on the new GetGranted 2.0 platform (currently waitlist-only). It connects you with a dedicated expert who supports you through the entire grant lifecycle — from application to claims to final reporting. Everything is handled inside the platform with simplified guided applications instead of complex funder forms. Grants with Grant Navigator support are marked with a special icon. Available only on annual GetGranted and annual GetGranted Plus plans. Business must be incorporated for at least 1 year.",
+    "knowledge": "Grant Navigator is a feature on GetGranted (https://app.getgranted.ai/). It connects you with a dedicated expert who supports you through the entire grant lifecycle — from application to claims to final reporting. Everything is handled inside the platform with simplified guided applications instead of complex funder forms. Grants with Grant Navigator support are marked with a special icon. Available on annual plans. Business must be incorporated for at least 1 year.",
     "cta_bridge": "If you need hands-on support right now, our current GrantedPro service offers full done-for-you grant management."
   },
   {
@@ -158,7 +158,7 @@
     "topic": "smart_filters_feature",
     "question": "What are Smart Filters?",
     "keywords": ["smart filters", "filters", "eligibility", "matching", "automated"],
-    "knowledge": "Smart Filters are a feature on the new GetGranted 2.0 platform (currently waitlist-only). Smart Filters automatically use your business profile and selected grant activities to show only grants you're eligible for. Every account starts with a 'Made for You' Smart Filter. You can create custom Smart Filters for specific projects, departments, or funding needs.",
+    "knowledge": "Smart Filters are a feature on GetGranted (https://app.getgranted.ai/). Smart Filters automatically use your business profile and selected grant activities to show only grants you're eligible for. Every account starts with a 'Made for You' Smart Filter. You can create custom Smart Filters for specific projects, departments, or funding needs.",
     "cta_bridge": "Want to find out what grants you qualify for right now? I can run a quick estimate based on your profile."
   },
   {
@@ -166,15 +166,15 @@
     "topic": "watchlists_feature",
     "question": "What are Watchlists?",
     "keywords": ["watchlists", "save", "track", "notifications", "alerts"],
-    "knowledge": "Watchlists are a feature on the new GetGranted 2.0 platform (currently waitlist-only). Watchlists let you save and track grants you care about most. Every Smart Filter automatically creates its own watchlist. You get notified automatically when there are changes — grants opening, deadline updates, or new information.",
-    "cta_bridge": "While you're waiting for the new platform to launch, I can help you identify what grants you qualify for today."
+    "knowledge": "Watchlists are a feature on GetGranted (https://app.getgranted.ai/). Watchlists let you save and track grants you care about most. Every Smart Filter automatically creates its own watchlist. You get notified automatically when there are changes — grants opening, deadline updates, or new information.",
+    "cta_bridge": "You can set up watchlists when you sign up at https://app.getgranted.ai/onboarding — and I can help you identify what grants you qualify for today."
   },
   {
     "id": "faq_21",
     "topic": "office_hours_feature",
     "question": "What are Office Hours?",
     "keywords": ["office hours", "live support", "expert access", "quarterly", "monthly"],
-    "knowledge": "Office Hours are live sessions with Granted's experts for support and platform guidance. On GetGranted 2.0 (currently waitlist-only): Lite gets no access, GetGranted tier gets quarterly access, Plus gets monthly access. Direct access to experts for questions, guidance, and support navigating the platform.",
+    "knowledge": "Office Hours are live sessions with Granted's experts for support and platform guidance, included on some GetGranted plans. Direct access to experts for questions, guidance, and support navigating the platform.",
     "cta_bridge": "If you want expert guidance right now, our current GrantedPro service includes dedicated grant strategist sessions and unlimited support."
   },
   {
@@ -191,7 +191,7 @@
     "question": "Do I need to be incorporated?",
     "keywords": ["incorporated", "incorporation", "sole proprietor", "unincorporated", "registered"],
     "knowledge": "For most grant programs, yes. Sole proprietors and unincorporated freelancers generally do not qualify for the majority of business grants. Incorporation is often the first step to grant eligibility. Some hiring and training grants may have flexibility, but market expansion and larger programs almost always require incorporation. If you're not incorporated yet, that's the first threshold to cross before pursuing grants.",
-    "cta_bridge": "There may still be smaller funding opportunities suited to where you are now. You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows — and once you're incorporated, a lot more opens up."
+    "cta_bridge": "There may still be smaller funding opportunities suited to where you are now. You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows — and once you're incorporated, a lot more opens up. Sign up at https://app.getgranted.ai/onboarding."
   },
   {
     "id": "faq_24",
@@ -238,7 +238,7 @@
     "topic": "which_service_right_for_me",
     "question": "Which service is right for me?",
     "keywords": ["which service", "right fit", "best option", "recommend", "choose", "decide"],
-    "knowledge": "The right service for this prospect is the Recommended product in <lead_info> — the system sets it from their profile and estimate. Name that product; don't work one out from revenue, headcount or the estimate. What each one is: GetGranted (https://granted.ca/getgranted/) is the grant-matching database for exploring and tracking programs; the GetGranted 2.0 waitlist is at https://getgranted.ca/waitlist/. Granted Starter (https://granted.ca/granted-starter/) is guided self-serve support for hiring and training applications. GrantedPro (https://granted.ca/grantedpro/) is the full done-for-you service with a dedicated Grant Strategist. Granted Export (https://granted.ca/granted-export/) covers CanExport for international expansion. Offer a call only when the Recommended product is Granted Pro.",
+    "knowledge": "The right service for this prospect is the Recommended product in <lead_info> — the system sets it from their profile and estimate. Name that product; don't work one out from revenue, headcount or the estimate. What each one is: GetGranted (https://app.getgranted.ai/) is our subscription grant-matching platform for exploring and tracking programs; sign-ups are at https://app.getgranted.ai/onboarding. Granted Starter (https://granted.ca/granted-starter/) is guided self-serve support for hiring and training applications. GrantedPro (https://granted.ca/grantedpro/) is the full done-for-you service with a dedicated Grant Strategist. Granted Export (https://granted.ca/granted-export/) covers CanExport for international expansion. Offer a call only when the Recommended product is Granted Pro.",
     "cta_bridge": "I can give you a quick funding estimate based on your business profile, and that'll help narrow down which service tier makes sense. Want to run through that?"
   },
   {
@@ -252,10 +252,10 @@
   {
     "id": "faq_31",
     "topic": "getgranted_2_transition",
-    "question": "What's happening with GetGranted and Starter? Why GetGranted 2.0?",
+    "question": "What's happening with GetGranted and Starter?",
     "keywords": ["transition", "merger", "combining", "getgranted 2.0 launch", "when", "2026", "new platform", "upgrade"],
-    "knowledge": "Starting in 2026, Granted Starter and GetGranted are evolving into one newly enhanced, all-in-one grant management platform called GetGranted 2.0. Your account and data will be securely transferred. The new platform features smarter tools (including Grant Navigator for guided applications), faster performance, and a more intuitive interface. GetGranted 2.0 is currently waitlist-only at https://getgranted.ca/waitlist/. In the meantime, both current GetGranted and Starter services remain fully operational and accepting new subscribers.",
-    "cta_bridge": "You can join the waitlist now for early access, or start with our current services and transition automatically when the new platform launches."
+    "knowledge": "GetGranted is live. Granted Starter and GetGranted now run on one all-in-one grant platform at https://app.getgranted.ai/, with smarter tools (including Grant Navigator for guided applications), faster performance and a more intuitive interface. New sign-ups are at https://app.getgranted.ai/onboarding.",
+    "cta_bridge": "You can sign up now at https://app.getgranted.ai/onboarding."
   },
   {
     "id": "faq_32",
@@ -268,10 +268,10 @@
   {
     "id": "faq_33",
     "topic": "getgranted_2_mention_rule",
-    "question": "Should I mention GetGranted 2.0?",
+    "question": "Should I mention GetGranted?",
     "keywords": ["getgranted 2.0", "waitlist", "new platform", "mention"],
-    "knowledge": "For all prospects recommended GetGranted or Starter (below GrantedPro), always mention GetGranted 2.0 as a secondary note after the primary current-tier recommendation. Example: We're also launching GetGranted 2.0 — join the waitlist at getgranted.ca/waitlist. Always lead with the current available service first.",
-    "cta_bridge": "Would you like to hear more about the current services or the upcoming platform?"
+    "knowledge": "For prospects whose Recommended product is Get Granted or Granted Starter, or who are not yet ready (Nonprofit included), mention GetGranted after the primary recommendation and invite them to sign up at https://app.getgranted.ai/onboarding. Don't mention it to Granted Pro prospects. Never quote a price. Don't promise a demo, an invite or a consultant review.",
+    "cta_bridge": "Want the GetGranted sign-up link?"
   },
   {
     "id": "faq_34",
